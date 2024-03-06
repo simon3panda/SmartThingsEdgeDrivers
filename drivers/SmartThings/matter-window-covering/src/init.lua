@@ -22,6 +22,9 @@ local MatterDriver = require "st.matter.driver"
 local DEFAULT_LEVEL = 0
 local PROFILE_MATCHED = "__profile_matched"
 
+local DEFAULT_STATUS = 0
+local cap_call_dirty_bit = 0 -- BIT0: Operational Status Attribute, BIT1:Current Position Attribute
+
 local function find_default_endpoint(device, cluster)
   local res = device.MATTER_DEFAULT_ENDPOINT
   local eps = device:get_endpoints(cluster)
@@ -133,6 +136,31 @@ local function current_pos_handler(driver, device, ib, response)
       ib.endpoint_id, capabilities.windowShadeLevel.shadeLevel(position)
     )
   end
+  if cap_call_dirty_bit == 2 then
+    local status = device:get_latest_state(
+      "main", capabilities.windowShade.ID,
+      capabilities.windowShade.windowShade
+    ) or DEFAULT_STATUS
+    state = state & clusters.WindowCovering.types.OperationalStatus.GLOBAL
+    if state == 0 then -- not moving
+      if position == 100 then -- open
+        device:emit_event_for_endpoint(ib.endpoint_id, attr.open())
+      elseif position == 0 then -- closed
+        device:emit_event_for_endpoint(ib.endpoint_id, attr.closed())
+      else
+        device:emit_event_for_endpoint(ib.endpoint_id, attr.partially_open())
+      end
+    elseif state == 1 then -- opening
+      device:emit_event_for_endpoint(ib.endpoint_id, attr.opening())
+    elseif state == 2 then -- closing
+      device:emit_event_for_endpoint(ib.endpoint_id, attr.closing())
+    else
+      device:emit_event_for_endpoint(ib.endpoint_id, attr.unknown())
+    end
+    cap_call_dirty_bit = 0
+  else
+    cap_call_dirty_bit = 1
+  end
 end
 
 -- checks the current position of the shade
@@ -164,6 +192,11 @@ local function current_status_handler(driver, device, ib, response)
     device:emit_event_for_endpoint(ib.endpoint_id, attr.closing())
   else
     device:emit_event_for_endpoint(ib.endpoint_id, attr.unknown())
+  end
+  if cap_call_dirty_bit == 1 then
+    cap_call_dirty_bit = 0
+  else
+    cap_call_dirty_bit = 2
   end
 end
 
