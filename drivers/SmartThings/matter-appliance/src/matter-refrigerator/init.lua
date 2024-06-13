@@ -179,6 +179,7 @@ local function refrigerator_tcc_supported_modes_attr_handler(driver, device, ib,
   end
   refrigeratorTccModeSupportedModesMap[ib.endpoint_id] = refrigeratorTccModeSupportedModes
   device:emit_event_for_endpoint(ib.endpoint_id, capabilities.mode.supportedModes(refrigeratorTccModeSupportedModes))
+  device:emit_event_for_endpoint(ib.endpoint_id, capabilities.mode.supportedArguments(refrigeratorTccModeSupportedModes))
 end
 
 local function refrigerator_tcc_mode_attr_handler(driver, device, ib, response)

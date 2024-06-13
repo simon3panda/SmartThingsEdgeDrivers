@@ -94,6 +94,7 @@ local function dishwasher_supported_modes_attr_handler(driver, device, ib, respo
     table.insert(dishwasherModeSupportedModes, mode.elements.label.value)
   end
   device:emit_event_for_endpoint(ib.endpoint_id, capabilities.mode.supportedModes(dishwasherModeSupportedModes))
+  device:emit_event_for_endpoint(ib.endpoint_id, capabilities.mode.supportedArguments(dishwasherModeSupportedModes))
 end
 
 local function dishwasher_mode_attr_handler(driver, device, ib, response)

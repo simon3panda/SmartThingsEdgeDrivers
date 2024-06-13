@@ -14,7 +14,6 @@ matterManufacturer:
     vendorId: 0x10e1
     productId: 0x1026
     deviceProfileName: dishwasher-tn-tl
-
 matterGeneric:
   - id: "matter/refrigerator"
     deviceLabel: Matter Refrigerator
