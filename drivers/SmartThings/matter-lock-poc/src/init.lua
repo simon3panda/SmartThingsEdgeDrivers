@@ -26,11 +26,10 @@ local DoorLock = clusters.DoorLock
 
 local lockAddUserID = "insideimage13541.newLockAddUser"
 local lockAddUser = capabilities[lockAddUserID]
+local lockModifyUserID = "insideimage13541.newLockModifyUser"
+local lockModifyUser = capabilities[lockModifyUserID]
 local lockClearUserID = "insideimage13541.newLockClearUser"
 local lockClearUser = capabilities[lockClearUserID]
-
-
-
 
 -- local lockPinCodeID = "insideimage13541.lockPinCode10"
 -- local lockPinCode = capabilities[lockPinCodeID]
@@ -51,6 +50,13 @@ local lockClearUser = capabilities[lockClearUserID]
 -- local lockClearCredID = "insideimage13541.lockClearCredential1"
 -- local lockClearCred = capabilities[lockClearCredID]
 
+local USER_STATUS_MAP = {
+  [0] = "",
+  [1] = lockModifyUser.userStatus.occupiedEnabled.NAME,
+  [2] = "",
+  [3] = lockModifyUser.userStatus.occupiedDisabled.NAME
+}
+
 local USER_TYPE_MAP = {
   [0] = lockAddUser.userType.unrestrictedUser.NAME,
   [1] = lockAddUser.userType.nonAccessUser.NAME,
@@ -60,9 +66,6 @@ local USER_TYPE_MAP = {
   [5] = lockAddUser.userType.scheduleRestrictedUser.NAME,
   [6] = lockAddUser.userType.remoteOnlyUser.NAME
 }
-
-
-
 
 
 
@@ -109,6 +112,8 @@ local function device_init(driver, device)
 
   local ep = device:component_to_endpoint(component_to_endpoint)
   device:emit_event(lockAddUser.userType.unrestrictedUser({state_change = true}))
+  device:emit_event(lockModifyUser.userStatus.occupiedEnabled({state_change = true}))
+  device:emit_event(lockModifyUser.userType.unrestrictedUser({state_change = true}))
 
   -- local opTypeTable = {
   --   lockSetUser.dataOperationType.add.NAME,
@@ -156,8 +161,6 @@ local function device_init(driver, device)
   local credential = {credential_type = 1, credential_index = 1}
   device:send(DoorLock.server.commands.SetCredential(device, ep, 0, credential, "\x30\x33\x35\x37\x39\x30", 1, nil, nil))
 end
-
-
 
 
 
@@ -467,7 +470,7 @@ local function handle_add_user_set_user_index(driver, device, command)
   device:emit_event(lockAddUser.userIndex(userIndex, {state_change = true}))
 end
 
-local function handle_set_user_type(driver, device, command)
+local function handle_add_set_user_type(driver, device, command)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_set_user_type !!!!!!!!!!!!!"))
 
   local userType = command.args.userType
@@ -493,12 +496,76 @@ local function handle_add_user(driver, device, command)
   device:send(
     DoorLock.server.commands.SetUser(
       device, ep,
-      0,          -- Operation Type: Add(0), Modify(1)
+      0,          -- Operation Type: Add(0), Modify(2)
       userIndex,  -- User Index
       nil,        -- User Name
       nil,        -- Unique ID
       nil,        -- User Status
       userType,   -- User Type
+      nil         -- Credential Rule
+    )
+  )
+end
+
+----------------------
+-- Lock Modify User --
+----------------------
+local function handle_modify_user_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_modify_user_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockModifyUser.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_modify_set_user_status(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_modify_set_user_status !!!!!!!!!!!!!"))
+
+  local userStatus = command.args.userStatus
+  log.info_with({hub_logs=true}, string.format("userStatus: %s", userStatus))
+  device:emit_event(lockModifyUser.userStatus(userStatus, {state_change = true}))
+end
+
+local function handle_modify_set_user_type(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_modify_set_user_type !!!!!!!!!!!!!"))
+
+  local userType = command.args.userType
+  log.info_with({hub_logs=true}, string.format("userType: %s", userType))
+  device:emit_event(lockModifyUser.userType(userType, {state_change = true}))
+end
+
+local function handle_modify_user(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_modify_user !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockModifyUserID, lockModifyUser.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local userStatus = device:get_latest_state("main", lockModifyUserID, lockModifyUser.userStatus.NAME)
+  log.info_with({hub_logs=true}, string.format("userStatus: %s", userStatus))
+  for statusInteger, statusString in pairs(USER_STATUS_MAP) do
+    if userStatus == statusString then
+      userStatus = stautsInteger
+      break
+    end
+  end
+  local userType = device:get_latest_state("main", lockModifyUserID, lockModifyUser.userType.NAME)
+  for typeInteger, typeString in pairs(USER_TYPE_MAP) do
+    if userType == typeString then
+      userType = typeInteger
+      break
+    end
+  end
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, userStatus: %s, userType: %s", userIndex, userStatus, userType))
+
+  device:send(
+    DoorLock.server.commands.SetUser(
+      device, ep,
+      2,          -- Operation Type: Add(0), Modify(2)
+      userIndex,  -- User Index
+      nil,        -- User Name
+      nil,        -- Unique ID
+      userStatus, -- User Status
+      nil,        -- User Type
       nil         -- Credential Rule
     )
   )
@@ -1034,6 +1101,19 @@ local function handle_refresh(driver, device, command)
   -- device:emit_event(lockClearCred.credType(lockSetCred.credType.select.NAME, {visibility = {displayed = false}}))
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 local matter_lock_driver = {
   lifecycle_handlers = {
     init = device_init,
@@ -1112,8 +1192,14 @@ local matter_lock_driver = {
     },
     [lockAddUserID] = {
       [lockAddUser.commands.setUserIndex.NAME] = handle_add_user_set_user_index,
-      [lockAddUser.commands.setUserType.NAME] = handle_set_user_type,
+      [lockAddUser.commands.setUserType.NAME] = handle_add_set_user_type,
       [lockAddUser.commands.addUser.NAME] = handle_add_user,
+    },
+    [lockModifyUserID] = {
+      [lockModifyUser.commands.setUserIndex.NAME] = handle_modify_user_set_user_index,
+      [lockModifyUser.commands.setUserStatus.NAME] = handle_modify_set_user_status,
+      [lockModifyUser.commands.setUserType.NAME] = handle_modify_set_user_type,
+      [lockModifyUser.commands.modifyUser.NAME] = handle_modify_user,
     },
     [lockClearUserID] = {
       [lockClearUser.commands.setUserIndex.NAME] = handle_clear_user_set_user_index,
@@ -1154,6 +1240,7 @@ local matter_lock_driver = {
   supported_capabilities = {
     capabilities.lock,
     lockAddUser,
+    lockModifyUser,
     lockClearUser,
     -- lockPinCode,
     -- lockStatus,
