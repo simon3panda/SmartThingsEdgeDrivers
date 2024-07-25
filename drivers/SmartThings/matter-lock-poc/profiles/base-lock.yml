@@ -4,6 +4,8 @@ components:
   capabilities:
   - id: lock
     version: 1
+  - id: insideimage13541.newLockGetUser2
+    version: 1
   - id: insideimage13541.newLockAddUser
     version: 1
   - id: insideimage13541.newLockClearUser
@@ -17,10 +19,6 @@ components:
   # - id: insideimage13541.lockStatusForPin1
   #   version: 1
   # - id: insideimage13541.lockStatusForUser3
-  #   version: 1
-  # - id: insideimage13541.lockSetUser13
-  #   version: 1
-  # - id: insideimage13541.lockGetUser2
   #   version: 1
   # - id: insideimage13541.lockSetCredential4
   #   version: 1

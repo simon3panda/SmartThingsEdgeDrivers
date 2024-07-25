@@ -30,6 +30,8 @@ local lockModifyUserID = "insideimage13541.newLockModifyUser"
 local lockModifyUser = capabilities[lockModifyUserID]
 local lockClearUserID = "insideimage13541.newLockClearUser"
 local lockClearUser = capabilities[lockClearUserID]
+local lockGetUserID = "insideimage13541.newLockGetUser2"
+local lockGetUser = capabilities[lockGetUserID]
 
 -- local lockPinCodeID = "insideimage13541.lockPinCode10"
 -- local lockPinCode = capabilities[lockPinCodeID]
@@ -41,8 +43,6 @@ local lockClearUser = capabilities[lockClearUserID]
 -- local lockStatusForUser = capabilities[lockStatusForUserID]
 -- local lockSetUserID = "insideimage13541.lockSetUser13"
 -- local lockSetUser = capabilities[lockSetUserID]
--- local lockGetUserID = "insideimage13541.lockGetUser2"
--- local lockGetUser = capabilities[lockGetUserID]
 -- local lockSetCredID = "insideimage13541.lockSetCredential4"
 -- local lockSetCred = capabilities[lockSetCredID]
 -- local lockGetCredID = "insideimage13541.lockGetCredentialStatus3"
@@ -58,21 +58,14 @@ local USER_STATUS_MAP = {
 }
 
 local USER_TYPE_MAP = {
-  [0] = lockAddUser.userType.unrestrictedUser.NAME,
-  [1] = lockAddUser.userType.nonAccessUser.NAME,
-  [2] = lockAddUser.userType.forcedUser.NAME,
-  [3] = lockAddUser.userType.disposableUser.NAME,
-  [4] = lockAddUser.userType.expiringUser.NAME,
-  [5] = lockAddUser.userType.scheduleRestrictedUser.NAME,
-  [6] = lockAddUser.userType.remoteOnlyUser.NAME
+  [0] = "unrestrictedUser",
+  [1] = "nonAccessUser",
+  [2] = "forcedUser",
+  [3] = "disposableUser",
+  [4] = "expiringUser",
+  [5] = "scheduleRestrictedUser",
+  [6] = "remoteOnlyUser"
 }
-
-
-
-
-
-
-
 
 
 
@@ -594,6 +587,135 @@ local function handle_clear_user(driver, device, command)
 end
 
 
+
+
+-------------------
+-- Lock Get User --
+-------------------
+local function handle_get_user_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_user_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockGetUser.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_get_user(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_user !!!!!!!!!!!!!"))
+
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockGetUserID, lockGetUser.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  
+  device:send(DoorLock.server.commands.GetUser(device, ep, userIndex))
+end
+
+local function get_user_response_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! get_user_response_handler !!!!!!!!!!!!!"))
+  if ib.status ~= im.InteractionResponse.Status.SUCCESS then
+    device.log.warn("Not taking action on GetUserResponse because failed status")
+    return
+  end
+  local elements = ib.info_block.data.elements
+  local user_name = elements.user_name.value
+  local user_uniqueid = elements.user_uniqueid.value
+  local user_status = elements.user_status.value
+  local user_type = elements.user_type.value
+  local credential_rule = elements.credential_rule.value
+  local creator_fabric_index = elements.creator_fabric_index.value
+  local last_modified_fabric_index = elements.last_modified_fabric_index.value
+  local next_user_index = elements.next_user_index.value
+
+  if user_name ~= nil then
+    log.info_with({hub_logs=true}, string.format("user_name: %s", user_name))
+    device:emit_event(lockGetUser.userName(user_name, {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("user_name: null"))
+    device:emit_event(lockGetUser.userName(" ", {state_change = true}))
+  end
+
+  if user_uniqueid ~= nil then
+    log.info_with({hub_logs=true}, string.format("user_uniqueid: %s", user_uniqueid))
+    device:emit_event(lockGetUser.userUniqueID(tostring(user_uniqueid), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("user_uniqueid: null"))
+    device:emit_event(lockGetUser.userUniqueID(" ", {state_change = true}))
+  end
+
+  if user_status ~= nil then
+    log.info_with({hub_logs=true}, string.format("user_status: %s", user_status))
+    local status = USER_STATUS_MAP[user_status]
+    device:emit_event(lockGetUser.userStatus(status, {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("user_status: null"))
+    device:emit_event(lockGetUser.userStatus(lockGetUser.userStatus.nullValue.NAME, {state_change = true}))
+  end
+
+  if user_type ~= nil then
+    log.info_with({hub_logs=true}, string.format("user_type: %s", user_type))
+    local type = USER_TYPE_MAP[user_type]
+    device:emit_event(lockGetUser.userType(type, {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("user_type: null"))
+    device:emit_event(lockGetUser.userType(lockGetUser.userType.nullValue.NAME, {state_change = true}))
+  end
+
+  if credential_rule ~= nil then
+    log.info_with({hub_logs=true}, string.format("credential_rule: %s", credential_rule))
+    local cred_rule = lockGetUser.credRule.single.NAME
+    if credential_rule == DoorLock.types.CredentialRuleEnum.SINGLE then
+      cred_rule = lockGetUser.credRule.single.NAME
+    elseif credential_rule == DoorLock.types.CredentialRuleEnum.DUAL then
+      cred_rule = lockGetUser.credRule.dule.NAME
+    elseif credential_rule == DoorLock.types.CredentialRuleEnum.TRI then
+      cred_rule = lockGetUser.credRule.tri.NAME
+    end
+    device:emit_event(lockGetUser.credRule(cred_rule, {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("credential_rule: null"))
+    device:emit_event(lockGetUser.credRule(lockGetUser.credRule.nullValue.NAME, {state_change = true}))
+  end
+
+  if creator_fabric_index ~= nil then
+    log.info_with({hub_logs=true}, string.format("creator_fabric_index: %s", creator_fabric_index))
+    device:emit_event(lockGetUser.creatorFabricIndex(tostring(creator_fabric_index), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("creator_fabric_index: null"))
+    device:emit_event(lockGetUser.creatorFabricIndex(" ", {state_change = true}))
+  end
+
+  if last_modified_fabric_index ~= nil then
+    log.info_with({hub_logs=true}, string.format("last_modified_fabric_index: %s", last_modified_fabric_index))
+    device:emit_event(lockGetUser.lastFabricIndex(tostring(last_modified_fabric_index), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("last_modified_fabric_index: null"))
+    device:emit_event(lockGetUser.lastFabricIndex(" ", {state_change = true}))
+  end
+
+  if next_user_index ~= nil then
+    log.info_with({hub_logs=true}, string.format("next_user_index: %s", next_user_index))
+    device:emit_event(lockGetUser.nextUserIndex(tostring(next_user_index), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("next_user_index: null"))
+    device:emit_event(lockGetUser.nextUserIndex(" ", {state_change = true}))
+  end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- local function handle_lock_with_pin_code(driver, device, command)
 --   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_lock_with_pin_code: %s !!!!!!!!!!!!!", command.args.pinCode))
 --   local ep = device:component_to_endpoint(command.component)
@@ -703,129 +825,6 @@ end
 --     user_index = math.tointeger(command.args.index)
 --     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_index: %d !!!!!!!!!!!!!", user_index))
 --     device:send(DoorLock.server.commands.SetUser(device, ep, data_op_type, user_index, user_name, unique_id, nil, user_type, nil))
---   end
--- end
-
--- -- GetUser(device, Endpoint, User Index)
--- local function handle_get_user(driver, device, command)
---   local ep = device:component_to_endpoint(command.component)
---   device:emit_event(lockGetUser.userIndex("", {visibility = {displayed = false}}))
---   device:emit_event(lockGetUser.userIndex(command.args.index, {visibility = {displayed = false}}))
---   if command.args.index ~= "" then
---     user_index = math.tointeger(command.args.index)
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_index: %d !!!!!!!!!!!!!", user_index))
---     device:send(DoorLock.server.commands.GetUser(device, ep, user_index))
---   end
--- end
-
--- local function get_user_response_handler(driver, device, ib, response)
---   if ib.status ~= im.InteractionResponse.Status.SUCCESS then
---     device.log.warn("Not taking action on GetUserResponse because failed status")
---     return
---   end
---   local elements = ib.info_block.data.elements
---   local user_name = elements.user_name.value
---   local user_uniqueid = elements.user_uniqueid.value
---   local user_status = elements.user_status.value
---   local user_type = elements.user_type.value
---   local credential_rule = elements.credential_rule.value
---   local creator_fabric_index = elements.creator_fabric_index.value
---   local last_modified_fabric_index = elements.last_modified_fabric_index.value
---   local next_user_index = elements.next_user_index.value
-
---   if user_name ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_index: %s !!!!!!!!!!!!!", user_name))
---     device:emit_event(lockGetUser.userName(user_name, {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_index: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.userName(" ", {visibility = {displayed = false}}))
---   end
---   if user_uniqueid ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_uniqueid: %s !!!!!!!!!!!!!", user_uniqueid))
---     device:emit_event(lockGetUser.userUniqueID(tostring(user_uniqueid), {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_uniqueid: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.userUniqueID(" ", {visibility = {displayed = false}}))
---   end
---   if user_status ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_status: %s !!!!!!!!!!!!!", user_status))
---     local status = lockGetUser.userStatus.available.NAME
---     if user_status == DoorLock.types.UserStatusEnum.AVAILABLE then
---       status = lockGetUser.userStatus.available.NAME
---     elseif user_status == DoorLock.types.UserStatusEnum.OCCUPIED_ENABLED then
---       status = lockGetUser.userStatus.occupiedEnabled.NAME
---     elseif user_status == DoorLock.types.UserStatusEnum.OCCUPIED_DISABLED then
---       status = lockGetUser.userStatus.occupiedDisabled.NAME
---     end
---     device:emit_event(lockGetUser.userStatus(status, {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_status: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.userStatus(lockGetUser.userStatus.nullValue.NAME, {visibility = {displayed = false}}))
---   end
---   if user_type ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_type: %s !!!!!!!!!!!!!", user_type))
---     local type = lockGetUser.userType.unrestricted.NAME
---     if user_type == DoorLock.types.UserTypeEnum.UNRESTRICTED_USER then
---       type = lockGetUser.userType.unrestricted.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.YEAR_DAY_SCHEDULE_USER then
---       type = lockGetUser.userType.yearDayScheduleUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.WEEK_DAY_SCHEDULE_USER then
---       type = lockGetUser.userType.weekDayScheduleUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.PROGRAMMING_USER then
---       type = lockGetUser.userType.programmingUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.NON_ACCESS_USER then
---       type = lockGetUser.userType.nonAccessUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.FORCED_USER then
---       type = lockGetUser.userType.forcedUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.DISPOSABLE_USER then
---       type = lockGetUser.userType.disposableUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.EXPIRING_USER then
---       type = lockGetUser.userType.expiringUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER then
---       type = lockGetUser.userType.scheduleRestrictedUser.NAME
---     elseif user_type == DoorLock.types.UserTypeEnum.REMOTE_ONLY_USER then
---       type = lockGetUser.userType.remoteOnlyUser.NAME
---     end
---     device:emit_event(lockGetUser.userType(type, {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! user_type: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.userType(lockGetUser.userType.nullValue.NAME, {visibility = {displayed = false}}))
---   end
---   if credential_rule ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! credential_rule: %s !!!!!!!!!!!!!", credential_rule))
---     local cred_rule = lockGetUser.credRule.single.NAME
---     if credential_rule == DoorLock.types.CredentialRuleEnum.SINGLE then
---       cred_rule = lockGetUser.credRule.single.NAME
---     elseif credential_rule == DoorLock.types.CredentialRuleEnum.DUAL then
---       cred_rule = lockGetUser.credRule.dule.NAME
---     elseif credential_rule == DoorLock.types.CredentialRuleEnum.TRI then
---       cred_rule = lockGetUser.credRule.tri.NAME
---     end
---     device:emit_event(lockGetUser.credRule(cred_rule, {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! credential_rule: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.credRule(lockGetUser.credRule.nullValue.NAME, {visibility = {displayed = false}}))
---   end
---   if creator_fabric_index ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! creator_fabric_index: %s !!!!!!!!!!!!!", creator_fabric_index))
---     device:emit_event(lockGetUser.creatorFabricIndex(tostring(creator_fabric_index), {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! creator_fabric_index: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.creatorFabricIndex(" ", {visibility = {displayed = false}}))
---   end
---   if last_modified_fabric_index ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! last_modified_fabric_index: %s !!!!!!!!!!!!!", last_modified_fabric_index))
---     device:emit_event(lockGetUser.lastFabricIndex(tostring(last_modified_fabric_index), {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! last_modified_fabric_index: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.lastFabricIndex(" ", {visibility = {displayed = false}}))
---   end
---   if next_user_index ~= nil then
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! next_user_index: %s !!!!!!!!!!!!!", next_user_index))
---     device:emit_event(lockGetUser.nextUserIndex(tostring(next_user_index), {visibility = {displayed = false}}))
---   else
---     log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! next_user_index: null !!!!!!!!!!!!!"))
---     device:emit_event(lockGetUser.nextUserIndex(" ", {visibility = {displayed = false}}))
 --   end
 -- end
 
@@ -1146,12 +1145,12 @@ local matter_lock_driver = {
     --     [DoorLock.events.LockUserChange.ID] = lock_user_change_event_handler,
     --   },
     -- },
-    -- cmd_response = {
-    --   [DoorLock.ID] = {
-    --     [DoorLock.client.commands.GetUserResponse.ID] = get_user_response_handler,
-    --     [DoorLock.client.commands.GetCredentialStatusResponse.ID] = get_credential_status_response_handler,
-    --   },
-    -- },
+    cmd_response = {
+      [DoorLock.ID] = {
+        [DoorLock.client.commands.GetUserResponse.ID] = get_user_response_handler,
+        -- [DoorLock.client.commands.GetCredentialStatusResponse.ID] = get_credential_status_response_handler,
+      },
+    },
   },
   subscribed_attributes = {
     [capabilities.lock.ID] = {DoorLock.attributes.LockState},
@@ -1205,6 +1204,10 @@ local matter_lock_driver = {
       [lockClearUser.commands.setUserIndex.NAME] = handle_clear_user_set_user_index,
       [lockClearUser.commands.clearUser.NAME] = handle_clear_user,
     },
+    [lockGetUserID] = {
+      [lockGetUser.commands.setUserIndex.NAME] = handle_get_user_set_user_index,
+      [lockGetUser.commands.getUser.NAME] = handle_get_user,
+    },
     -- [lockPinCodeID] = {
     --   [lockPinCode.commands.lockWithPinCode.NAME] = handle_lock_with_pin_code,
     --   [lockPinCode.commands.unlockWithPinCode.NAME] = handle_unlock_with_pin_code,
@@ -1215,9 +1218,6 @@ local matter_lock_driver = {
     --   [lockSetUser.commands.setUserName.NAME] = handle_set_user_name,
     --   [lockSetUser.commands.setUserUniqueID.NAME] = handle_set_user_unique_id,
     --   [lockSetUser.commands.setUserType.NAME] = handle_set_user_type,
-    -- },
-    -- [lockGetUserID] = {
-    --   [lockGetUser.commands.getUser.NAME] = handle_get_user,
     -- },
     -- [lockSetCredID] = {
     --   [lockSetCred.commands.setDataOperationType.NAME] = handle_cred_set_data_operation_type,
@@ -1242,12 +1242,11 @@ local matter_lock_driver = {
     lockAddUser,
     lockModifyUser,
     lockClearUser,
+    lockGetUser,
     -- lockPinCode,
     -- lockStatus,
     -- lockStatusForPin,
     -- lockStatusForUser,
-    -- lockSetUser,
-    -- lockGetUser,
     -- lockSetCredential,
     -- lockGetCred,
   },
