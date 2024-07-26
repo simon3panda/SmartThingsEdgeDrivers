@@ -6,6 +6,8 @@ components:
     version: 1
   - id: insideimage13541.newLockGetUser
     version: 1
+  - id: insideimage13541.newLockGetPin
+    version: 1
   - id: insideimage13541.newLockAddUser
     version: 1
   - id: insideimage13541.newLockClearUser
@@ -14,6 +16,10 @@ components:
     version: 1
   #
   - id: insideimage13541.newLockAddPin
+    version: 1
+  - id: insideimage13541.newLockClearPin
+    version: 1
+  - id: insideimage13541.newLockModifyPin
     version: 1
   # - id: insideimage13541.lockPinCode10
   #   version: 1
@@ -24,10 +30,6 @@ components:
   # - id: insideimage13541.lockStatusForUser3
   #   version: 1
   # - id: insideimage13541.lockSetCredential4
-  #   version: 1
-  # - id: insideimage13541.lockGetCredentialStatus3
-  #   version: 1
-  # - id: insideimage13541.lockClearCredential1
   #   version: 1
   # - id: tamperAlert
   #   version: 1
