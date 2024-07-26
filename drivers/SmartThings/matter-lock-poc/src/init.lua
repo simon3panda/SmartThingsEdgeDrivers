@@ -26,6 +26,7 @@ local DoorLock = clusters.DoorLock
 
 local lockWithPinID = "insideimage13541.newLockWithPin"
 local lockWithPin = capabilities[lockWithPinID]
+
 local lockAddUserID = "insideimage13541.newLockAddUser"
 local lockAddUser = capabilities[lockAddUserID]
 local lockModifyUserID = "insideimage13541.newLockModifyUser"
@@ -34,6 +35,7 @@ local lockClearUserID = "insideimage13541.newLockClearUser"
 local lockClearUser = capabilities[lockClearUserID]
 local lockGetUserID = "insideimage13541.newLockGetUser"
 local lockGetUser = capabilities[lockGetUserID]
+
 local lockAddPinID = "insideimage13541.newLockAddPin"
 local lockAddPin = capabilities[lockAddPinID]
 local lockModifyPinID = "insideimage13541.newLockModifyPin"
@@ -42,6 +44,20 @@ local lockClearPinID = "insideimage13541.newLockClearPin"
 local lockClearPin = capabilities[lockClearPinID]
 local lockGetPinID = "insideimage13541.newLockGetPin"
 local lockGetPin = capabilities[lockGetPinID]
+
+local lockAddWeekScheduleID = "insideimage13541.newLockAddWeekSchedule"
+local lockAddWeekSchedule = capabilities[lockAddWeekScheduleID]
+local lockClearWeekScheduleID = "insideimage13541.newLockClearWeekSchedule"
+local lockClearWeekSchedule = capabilities[lockClearWeekScheduleID]
+local lockGetWeekScheduleID = "insideimage13541.newLockGetWeekSchedule"
+local lockGetWeekSchedule = capabilities[lockGetWeekScheduleID]
+
+local lockAddYearScheduleID = "insideimage13541.newLockAddYearSchedule"
+local lockAddYearSchedule = capabilities[lockAddYearScheduleID]
+local lockClearYearScheduleID = "insideimage13541.newLockClearYearSchedule"
+local lockClearYearSchedule = capabilities[lockClearYearScheduleID]
+local lockGetYearScheduleID = "insideimage13541.newLockGetYearSchedule"
+local lockGetYearSchedule = capabilities[lockGetYearScheduleID]
 
 -- local lockStatusID = "insideimage13541.lockStatus1"
 -- local lockStatus = capabilities[lockStatusID]
@@ -71,6 +87,15 @@ local USER_TYPE_MAP = {
   [10] = "null"
 }
 
+local function numToBinStr(num)
+	ret = ""
+	while num ~= 1 and num ~= 0 do
+		ret = tostring(num % 2)..ret
+		num = math.modf(num / 2)
+	end
+	ret = tostring(num)..ret
+	return ret
+end
 
 
 
@@ -985,6 +1010,433 @@ local function get_credential_status_response_handler(driver, device, ib, respon
   end
 end
 
+----------------------------
+-- Lock Add Week Schedule --
+----------------------------
+local function handle_add_week_schedule_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockAddWeekSchedule.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_add_week_schedule_set_schedule_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule_set_schedule_index !!!!!!!!!!!!!"))
+
+  local scheduleIndex = command.args.scheduleIndex
+  log.info_with({hub_logs=true}, string.format("scheduleIndex: %s", scheduleIndex))
+  device:emit_event(lockAddWeekSchedule.scheduleIndex(scheduleIndex, {state_change = true}))
+end
+
+local function handle_add_week_schedule_set_days_mask(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule_set_days_mask !!!!!!!!!!!!!"))
+
+  local daysMask = command.args.daysMask
+  log.info_with({hub_logs=true}, string.format("daysMask: %s", daysMask))
+  device:emit_event(lockAddWeekSchedule.daysMask(daysMask, {state_change = true}))
+end
+
+local function handle_add_week_schedule_set_start_hour(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule_set_start_hour !!!!!!!!!!!!!"))
+
+  local startHour = command.args.startHour
+  log.info_with({hub_logs=true}, string.format("startHour: %s", startHour))
+  device:emit_event(lockAddWeekSchedule.startHour(startHour, {state_change = true}))
+end
+
+local function handle_add_week_schedule_set_end_hour(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule_set_end_hour !!!!!!!!!!!!!"))
+
+  local endHour = command.args.endHour
+  log.info_with({hub_logs=true}, string.format("endHour: %s", endHour))
+  device:emit_event(lockAddWeekSchedule.endHour(endHour, {state_change = true}))
+end
+
+local function handle_add_week_schedule(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockAddWeekScheduleID, lockAddWeekSchedule.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local scheduleIndex = device:get_latest_state("main", lockAddWeekScheduleID, lockAddWeekSchedule.scheduleIndex.NAME)
+  scheduleIndex = math.tointeger(scheduleIndex)
+  local daysMaskBin = device:get_latest_state("main", lockAddWeekScheduleID, lockAddWeekSchedule.daysMask.NAME)
+  local daysMaskDec = tonumber(daysMask, 2)
+  local startHour = device:get_latest_state("main", lockAddWeekScheduleID, lockAddWeekSchedule.startHour.NAME)
+  startHour = math.tointeger(startHour)
+  local endHour = device:get_latest_state("main", lockAddWeekScheduleID, lockAddWeekSchedule.endHour.NAME)
+  endHour = math.tointeger(endHour)
+
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, scheduleIndex: %s", userIndex, scheduleIndex))
+  log.info_with({hub_logs=true}, string.format("daysMaskBin: %s", daysMaskBin))
+  log.info_with({hub_logs=true}, string.format("startHour: %s, endHour: %s", startHour, endHour))
+
+  device:send(
+    DoorLock.server.commands.SetWeekDaySchedule(
+      device, ep,
+      scheduleIndex, -- Week Day Schedule Index
+      userIndex,     -- User Index
+      daysMaskDec,   -- Days Mask
+      startHour,     -- Start Hour
+      00,            -- Start Minute
+      endHour,       -- End Hour
+      00             -- End Minute
+    )
+  )
+end
+
+------------------------------
+-- Lock Clear Week Schedule --
+------------------------------
+local function handle_clear_week_schedule_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_week_schedule_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockClearWeekSchedule.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_clear_week_schedule_set_schedule_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_week_schedule_set_schedule_index !!!!!!!!!!!!!"))
+
+  local scheduleIndex = command.args.scheduleIndex
+  log.info_with({hub_logs=true}, string.format("scheduleIndex: %s", scheduleIndex))
+  device:emit_event(lockClearWeekSchedule.scheduleIndex(scheduleIndex, {state_change = true}))
+end
+
+local function handle_clear_week_schedule(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_week_schedule !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockClearWeekScheduleID, lockClearWeekSchedule.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local scheduleIndex = device:get_latest_state("main", lockClearWeekScheduleID, lockClearWeekSchedule.scheduleIndex.NAME)
+  scheduleIndex = math.tointeger(scheduleIndex)
+
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, scheduleIndex: %s", userIndex, scheduleIndex))
+
+  device:send(
+    DoorLock.server.commands.ClearWeekDaySchedule(
+      device, ep,
+      scheduleIndex, -- Week Day Schedule Index
+      userIndex      -- User Index
+    )
+  )
+end
+
+----------------------------
+-- Lock Get Week Schedule --
+----------------------------
+local function handle_get_week_schedule_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_week_schedule_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockGetWeekSchedule.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_get_week_schedule_set_schedule_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_week_schedule_set_schedule_index !!!!!!!!!!!!!"))
+
+  local scheduleIndex = command.args.scheduleIndex
+  log.info_with({hub_logs=true}, string.format("scheduleIndex: %s", scheduleIndex))
+  device:emit_event(lockGetWeekSchedule.scheduleIndex(scheduleIndex, {state_change = true}))
+end
+
+local function handle_get_week_schedule(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_week_schedule !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockGetWeekScheduleID, lockGetWeekSchedule.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local scheduleIndex = device:get_latest_state("main", lockGetWeekScheduleID, lockGetWeekSchedule.scheduleIndex.NAME)
+  scheduleIndex = math.tointeger(scheduleIndex)
+
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, scheduleIndex: %s", userIndex, scheduleIndex))
+
+  device:send(
+    DoorLock.server.commands.GetWeekDaySchedule(
+      device, ep,
+      scheduleIndex, -- Week Day Schedule Index
+      userIndex      -- User Index
+    )
+  )
+end
+
+------------------------------------
+-- Get Week Day Schedule Response --
+------------------------------------
+local function get_week_day_schedule_response_handler(driver, device, ib, response)
+  if ib.status ~= im.InteractionResponse.Status.SUCCESS then
+    device.log.warn("Not taking action on GetWeekDayScheduleResponse because failed status")
+    return
+  end
+
+  local elements = ib.info_block.data.elements
+  local status = elements.status.value
+  local result = "Success"
+  if status == DoorLock.types.DlStatus.FAILURE then
+    result = "Failure"
+  elseif status == DoorLock.types.DlStatus.DUPLICATE then
+    result = "Duplicate"
+  elseif status == DoorLock.types.DlStatus.OCCUPIED then
+    result = "Occupied"
+  elseif status == DoorLock.types.DlStatus.INVALID_FIELD then
+    result = "Invalid Field"
+  elseif status == DoorLock.types.DlStatus.RESOURCE_EXHAUSTED then
+    result = "Resource Exhausted"
+  elseif status == DoorLock.types.DlStatus.NOT_FOUND then
+    result = "Not Found"
+  end
+  log.info_with({hub_logs=true}, string.format("status: %s", result))
+  device:emit_event(lockGetWeekSchedule.status(result, {state_change = true}))
+  if status ~= DoorLock.types.DlStatus.SUCCESS then
+    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_credential_response_handler: failure !!!!!!!!!!!!!"))
+    return
+  end
+
+  local daysMask = elements.days_mask.value
+  local startHour = elements.start_hour.value
+  local startMinute = elements.start_minute.value
+  local endHour = elements.end_hour.value
+  local endMinute = elements.end_minute.value
+
+  if daysMask ~= nil then
+    log.info_with({hub_logs=true}, string.format("daysMask: %s", daysMask))
+    device:emit_event(lockGetWeekSchedule.daysMask(numToBinStr(daysMask), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("daysMask: null"))
+    device:emit_event(lockGetWeekSchedule.daysMask("Null", {state_change = true}))
+  end
+
+  if startHour ~= nil then
+    log.info_with({hub_logs=true}, string.format("startHour: %d", startHour))
+    device:emit_event(lockGetWeekSchedule.startHour(tostring(startHour), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("startHour: null"))
+    device:emit_event(lockGetWeekSchedule.startHour("Null", {state_change = true}))
+  end
+
+  if startMinute ~= nil then
+    log.info_with({hub_logs=true}, string.format("startMinute: %d", startMinute))
+    device:emit_event(lockGetWeekSchedule.startMinute(tostring(startMinute), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("startMinute: null"))
+    device:emit_event(lockGetWeekSchedule.startMinute("Null", {state_change = true}))
+  end
+
+  if endHour ~= nil then
+    log.info_with({hub_logs=true}, string.format("endHour: %d", endHour))
+    device:emit_event(lockGetWeekSchedule.endHour(tostring(endHour), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("endHour: null"))
+    device:emit_event(lockGetWeekSchedule.endHour("Null", {state_change = true}))
+  end
+
+  if endMinute ~= nil then
+    log.info_with({hub_logs=true}, string.format("endMinute: %d", endMinute))
+    device:emit_event(lockGetWeekSchedule.endMinute(tostring(endMinute), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("endMinute: null"))
+    device:emit_event(lockGetWeekSchedule.endMinute("Null", {state_change = true}))
+  end
+end
+
+----------------------------
+-- Lock Add Year Schedule --
+----------------------------
+local function handle_add_year_schedule_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_year_schedule_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockAddYearSchedule.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_add_year_schedule_set_schedule_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_year_schedule_set_schedule_index !!!!!!!!!!!!!"))
+
+  local scheduleIndex = command.args.scheduleIndex
+  log.info_with({hub_logs=true}, string.format("scheduleIndex: %s", scheduleIndex))
+  device:emit_event(lockAddYearSchedule.scheduleIndex(scheduleIndex, {state_change = true}))
+end
+
+local function handle_add_year_schedule_set_start_time(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_year_schedule_set_start_time !!!!!!!!!!!!!"))
+
+  local startTime = command.args.startTime
+  log.info_with({hub_logs=true}, string.format("startTime: %s", startTime))
+  device:emit_event(lockAddYearSchedule.startTime(startTime, {state_change = true}))
+end
+
+local function handle_add_year_schedule_set_end_time(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_year_schedule_set_end_time !!!!!!!!!!!!!"))
+
+  local endTime = command.args.endTime
+  log.info_with({hub_logs=true}, string.format("endTime: %s", endTime))
+  device:emit_event(lockAddYearSchedule.endTime(endTime, {state_change = true}))
+end
+
+local function handle_add_year_schedule(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_week_schedule !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockAddYearScheduleID, lockAddYearSchedule.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local scheduleIndex = device:get_latest_state("main", lockAddYearScheduleID, lockAddYearSchedule.scheduleIndex.NAME)
+  scheduleIndex = math.tointeger(scheduleIndex)
+  -- local startTime = device:get_latest_state("main", lockAddYearScheduleID, lockAddYearSchedule.startTime.NAME)
+  -- local endTime = device:get_latest_state("main", lockAddYearScheduleID, lockAddYearSchedule.endTime.NAME)
+  
+  -- Temporary time
+  local startTime = 1721746800
+  local endTime = 1724425200
+
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, scheduleIndex: %s", userIndex, scheduleIndex))
+  log.info_with({hub_logs=true}, string.format("startTime: %s, endTime: %s", startTime, endTime))
+
+  device:send(
+    DoorLock.server.commands.SetYearDaySchedule(
+      device, ep,
+      scheduleIndex, -- Year Day Schedule Index
+      userIndex,     -- User Index
+      startTime,     -- Local Start Time
+      endTime        -- Local End Time
+    )
+  )
+end
+
+------------------------------
+-- Lock Clear Year Schedule --
+------------------------------
+local function handle_clear_year_schedule_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_year_schedule_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockClearYearSchedule.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_clear_year_schedule_set_schedule_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_year_schedule_set_schedule_index !!!!!!!!!!!!!"))
+
+  local scheduleIndex = command.args.scheduleIndex
+  log.info_with({hub_logs=true}, string.format("scheduleIndex: %s", scheduleIndex))
+  device:emit_event(lockClearYearSchedule.scheduleIndex(scheduleIndex, {state_change = true}))
+end
+
+local function handle_clear_year_schedule(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_clear_year_schedule !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockClearYearScheduleID, lockClearYearSchedule.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local scheduleIndex = device:get_latest_state("main", lockClearYearScheduleID, lockClearYearSchedule.scheduleIndex.NAME)
+  scheduleIndex = math.tointeger(scheduleIndex)
+
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, scheduleIndex: %s", userIndex, scheduleIndex))
+
+  device:send(
+    DoorLock.server.commands.ClearYearDaySchedule(
+      device, ep,
+      scheduleIndex, -- Year Day Schedule Index
+      userIndex      -- User Index
+    )
+  )
+end
+
+----------------------------
+-- Lock Get Year Schedule --
+----------------------------
+local function handle_get_year_schedule_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_year_schedule_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockGetYearSchedule.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_get_year_schedule_set_schedule_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_year_schedule_set_schedule_index !!!!!!!!!!!!!"))
+
+  local scheduleIndex = command.args.scheduleIndex
+  log.info_with({hub_logs=true}, string.format("scheduleIndex: %s", scheduleIndex))
+  device:emit_event(lockGetYearSchedule.scheduleIndex(scheduleIndex, {state_change = true}))
+end
+
+local function handle_get_year_schedule(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_get_year_schedule !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local userIndex = device:get_latest_state("main", lockGetYearScheduleID, lockGetYearSchedule.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local scheduleIndex = device:get_latest_state("main", lockGetYearScheduleID, lockGetYearSchedule.scheduleIndex.NAME)
+  scheduleIndex = math.tointeger(scheduleIndex)
+
+  log.info_with({hub_logs=true}, string.format("userIndex: %s, scheduleIndex: %s", userIndex, scheduleIndex))
+
+  device:send(
+    DoorLock.server.commands.GetYearDaySchedule(
+      device, ep,
+      scheduleIndex, -- Year Day Schedule Index
+      userIndex      -- User Index
+    )
+  )
+end
+
+------------------------------------
+-- Get Year Day Schedule Response --
+------------------------------------
+local function get_year_day_schedule_response_handler(driver, device, ib, response)
+  if ib.status ~= im.InteractionResponse.Status.SUCCESS then
+    device.log.warn("Not taking action on GetYearDayScheduleResponse because failed status")
+    return
+  end
+
+  local elements = ib.info_block.data.elements
+  local status = elements.status.value
+  local result = "Success"
+  if status == DoorLock.types.DlStatus.FAILURE then
+    result = "Failure"
+  elseif status == DoorLock.types.DlStatus.DUPLICATE then
+    result = "Duplicate"
+  elseif status == DoorLock.types.DlStatus.OCCUPIED then
+    result = "Occupied"
+  elseif status == DoorLock.types.DlStatus.INVALID_FIELD then
+    result = "Invalid Field"
+  elseif status == DoorLock.types.DlStatus.RESOURCE_EXHAUSTED then
+    result = "Resource Exhausted"
+  elseif status == DoorLock.types.DlStatus.NOT_FOUND then
+    result = "Not Found"
+  end
+  log.info_with({hub_logs=true}, string.format("status: %s", result))
+  device:emit_event(lockGetYearSchedule.status(result, {state_change = true}))
+  if status ~= DoorLock.types.DlStatus.SUCCESS then
+    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_credential_response_handler: failure !!!!!!!!!!!!!"))
+    return
+  end
+
+  local startTime = elements.loca_start_time.value
+  local endTime = elements.loca_end_time.value
+
+  if startTime ~= nil then
+    log.info_with({hub_logs=true}, string.format("startTime: %d", startTime))
+    device:emit_event(lockGetYearSchedule.startTime(tostring(startTime), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("startTime: null"))
+    device:emit_event(lockGetYearSchedule.startTime("Null", {state_change = true}))
+  end
+
+  if endTime ~= nil then
+    log.info_with({hub_logs=true}, string.format("endTime: %d", endTime))
+    device:emit_event(lockGetYearSchedule.endTime(tostring(endTime), {state_change = true}))
+  else
+    log.info_with({hub_logs=true}, string.format("endTime: null"))
+    device:emit_event(lockGetYearSchedule.endTime("Null", {state_change = true}))
+  end
+end
+
 local function handle_refresh(driver, device, command)
   local req = DoorLock.attributes.LockState:read(device)
   device:send(req)
@@ -1040,6 +1492,7 @@ local matter_lock_driver = {
         [DoorLock.client.commands.GetUserResponse.ID] = get_user_response_handler,
         [DoorLock.client.commands.SetCredentialResponse.ID] = set_credential_response_handler,
         [DoorLock.client.commands.GetCredentialStatusResponse.ID] = get_credential_status_response_handler,
+        [DoorLock.client.commands.GetWeekDayScheduleResponse.ID] = get_week_day_schedule_response_handler,
       },
     },
   },
@@ -1130,6 +1583,41 @@ local matter_lock_driver = {
       [lockGetPin.commands.setCredIndex.NAME] = handle_get_pin_set_cred_index,
       [lockGetPin.commands.getPin.NAME] = handle_get_pin,
     },
+    [lockAddWeekScheduleID] = {
+      [lockAddWeekSchedule.commands.setUserIndex.NAME] = handle_add_week_schedule_set_user_index,
+      [lockAddWeekSchedule.commands.setScheduleIndex.NAME] = handle_add_week_schedule_set_schedule_index,
+      [lockAddWeekSchedule.commands.setDaysMask.NAME] = handle_add_week_schedule_set_days_mask,
+      [lockAddWeekSchedule.commands.setStartHour.NAME] = handle_add_week_schedule_set_start_hour,
+      [lockAddWeekSchedule.commands.setEndHour.NAME] = handle_add_week_schedule_set_end_hour,
+      [lockAddWeekSchedule.commands.addWeekSchedule.NAME] = handle_add_week_schedule,
+    },
+    [lockClearWeekScheduleID] = {
+      [lockClearWeekSchedule.commands.setUserIndex.NAME] = handle_clear_week_schedule_set_user_index,
+      [lockClearWeekSchedule.commands.setScheduleIndex.NAME] = handle_clear_week_schedule_set_schedule_index,
+      [lockClearWeekSchedule.commands.clearWeekSchedule.NAME] = handle_clear_week_schedule,
+    },
+    [lockGetWeekScheduleID] = {
+      [lockGetWeekSchedule.commands.setUserIndex.NAME] = handle_get_week_schedule_set_user_index,
+      [lockGetWeekSchedule.commands.setScheduleIndex.NAME] = handle_get_week_schedule_set_schedule_index,
+      [lockGetWeekSchedule.commands.getWeekSchedule.NAME] = handle_get_week_schedule,
+    },
+    [lockAddYearScheduleID] = {
+      [lockAddYearSchedule.commands.setUserIndex.NAME] = handle_add_year_schedule_set_user_index,
+      [lockAddYearSchedule.commands.setScheduleIndex.NAME] = handle_add_year_schedule_set_schedule_index,
+      [lockAddYearSchedule.commands.setStartTime.NAME] = handle_add_year_schedule_set_start_time,
+      [lockAddYearSchedule.commands.setEndTime.NAME] = handle_add_year_schedule_set_end_time,
+      [lockAddYearSchedule.commands.addYearSchedule.NAME] = handle_add_year_schedule,
+    },
+    [lockClearYearScheduleID] = {
+      [lockClearYearSchedule.commands.setUserIndex.NAME] = handle_clear_year_schedule_set_user_index,
+      [lockClearYearSchedule.commands.setScheduleIndex.NAME] = handle_clear_year_schedule_set_schedule_index,
+      [lockClearYearSchedule.commands.clearYearSchedule.NAME] = handle_clear_year_schedule,
+    },
+    [lockGetYearScheduleID] = {
+      [lockGetYearSchedule.commands.setUserIndex.NAME] = handle_get_year_schedule_set_user_index,
+      [lockGetYearSchedule.commands.setScheduleIndex.NAME] = handle_get_year_schedule_set_schedule_index,
+      [lockGetYearSchedule.commands.getYearSchedule.NAME] = handle_get_year_schedule,
+    },
     [capabilities.refresh.ID] = {[capabilities.refresh.commands.refresh.NAME] = handle_refresh}
   },
   supported_capabilities = {
@@ -1143,6 +1631,12 @@ local matter_lock_driver = {
     lockModifyPin,
     lockClearPin,
     lockGetPin,
+    lockAddWeekSchedule,
+    lockClearWeekSchedule,
+    lockGetWeekSchedule,
+    lockAddYearSchedule,
+    lockClearYearSchedule,
+    lockGetYearSchedule,
     -- lockStatus,
     -- lockStatusForPin,
     -- lockStatusForUser,
