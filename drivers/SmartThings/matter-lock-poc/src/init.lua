@@ -30,8 +30,10 @@ local lockModifyUserID = "insideimage13541.newLockModifyUser"
 local lockModifyUser = capabilities[lockModifyUserID]
 local lockClearUserID = "insideimage13541.newLockClearUser"
 local lockClearUser = capabilities[lockClearUserID]
-local lockGetUserID = "insideimage13541.newLockGetUser2"
+local lockGetUserID = "insideimage13541.newLockGetUser"
 local lockGetUser = capabilities[lockGetUserID]
+local lockAddPinID = "insideimage13541.newLockAddPin"
+local lockAddPin = capabilities[lockAddPinID]
 
 -- local lockPinCodeID = "insideimage13541.lockPinCode10"
 -- local lockPinCode = capabilities[lockPinCodeID]
@@ -43,8 +45,6 @@ local lockGetUser = capabilities[lockGetUserID]
 -- local lockStatusForUser = capabilities[lockStatusForUserID]
 -- local lockSetUserID = "insideimage13541.lockSetUser13"
 -- local lockSetUser = capabilities[lockSetUserID]
--- local lockSetCredID = "insideimage13541.lockSetCredential4"
--- local lockSetCred = capabilities[lockSetCredID]
 -- local lockGetCredID = "insideimage13541.lockGetCredentialStatus3"
 -- local lockGetCred = capabilities[lockGetCredID]
 -- local lockClearCredID = "insideimage13541.lockClearCredential1"
@@ -59,13 +59,21 @@ local USER_STATUS_MAP = {
 
 local USER_TYPE_MAP = {
   [0] = "unrestrictedUser",
-  [1] = "nonAccessUser",
-  [2] = "forcedUser",
-  [3] = "disposableUser",
-  [4] = "expiringUser",
-  [5] = "scheduleRestrictedUser",
-  [6] = "remoteOnlyUser"
+  [1] = "yearDayScheduleUser",
+  [2] = "weekDayScheduleUser",
+  [3] = "programmingUser",
+  [4] = "nonAccessUser",
+  [5] = "forcedUser",
+  [6] = "disposableUser",
+  [7] = "expiringUser",
+  [8] = "scheduleRestrictedUser",
+  [9] = "remoteOnlyUser",
+  [10] = "null"
 }
+
+
+
+
 
 
 
@@ -107,6 +115,7 @@ local function device_init(driver, device)
   device:emit_event(lockAddUser.userType.unrestrictedUser({state_change = true}))
   device:emit_event(lockModifyUser.userStatus.occupiedEnabled({state_change = true}))
   device:emit_event(lockModifyUser.userType.unrestrictedUser({state_change = true}))
+  device:emit_event(lockAddPin.userType.unrestrictedUser({state_change = true}))
 
   -- local opTypeTable = {
   --   lockSetUser.dataOperationType.add.NAME,
@@ -586,9 +595,6 @@ local function handle_clear_user(driver, device, command)
   device:send(DoorLock.server.commands.ClearUser(device, ep, userIndex))
 end
 
-
-
-
 -------------------
 -- Lock Get User --
 -------------------
@@ -627,12 +633,12 @@ local function get_user_response_handler(driver, device, ib, response)
   local last_modified_fabric_index = elements.last_modified_fabric_index.value
   local next_user_index = elements.next_user_index.value
 
-  if user_name ~= nil then
+  if user_name ~= nil and user_name ~= "" then
     log.info_with({hub_logs=true}, string.format("user_name: %s", user_name))
     device:emit_event(lockGetUser.userName(user_name, {state_change = true}))
   else
     log.info_with({hub_logs=true}, string.format("user_name: null"))
-    device:emit_event(lockGetUser.userName(" ", {state_change = true}))
+    device:emit_event(lockGetUser.userName("null", {state_change = true}))
   end
 
   if user_uniqueid ~= nil then
@@ -640,7 +646,7 @@ local function get_user_response_handler(driver, device, ib, response)
     device:emit_event(lockGetUser.userUniqueID(tostring(user_uniqueid), {state_change = true}))
   else
     log.info_with({hub_logs=true}, string.format("user_uniqueid: null"))
-    device:emit_event(lockGetUser.userUniqueID(" ", {state_change = true}))
+    device:emit_event(lockGetUser.userUniqueID("null", {state_change = true}))
   end
 
   if user_status ~= nil then
@@ -682,7 +688,7 @@ local function get_user_response_handler(driver, device, ib, response)
     device:emit_event(lockGetUser.creatorFabricIndex(tostring(creator_fabric_index), {state_change = true}))
   else
     log.info_with({hub_logs=true}, string.format("creator_fabric_index: null"))
-    device:emit_event(lockGetUser.creatorFabricIndex(" ", {state_change = true}))
+    device:emit_event(lockGetUser.creatorFabricIndex("null", {state_change = true}))
   end
 
   if last_modified_fabric_index ~= nil then
@@ -690,7 +696,7 @@ local function get_user_response_handler(driver, device, ib, response)
     device:emit_event(lockGetUser.lastFabricIndex(tostring(last_modified_fabric_index), {state_change = true}))
   else
     log.info_with({hub_logs=true}, string.format("last_modified_fabric_index: null"))
-    device:emit_event(lockGetUser.lastFabricIndex(" ", {state_change = true}))
+    device:emit_event(lockGetUser.lastFabricIndex("null", {state_change = true}))
   end
 
   if next_user_index ~= nil then
@@ -698,11 +704,190 @@ local function get_user_response_handler(driver, device, ib, response)
     device:emit_event(lockGetUser.nextUserIndex(tostring(next_user_index), {state_change = true}))
   else
     log.info_with({hub_logs=true}, string.format("next_user_index: null"))
-    device:emit_event(lockGetUser.nextUserIndex(" ", {state_change = true}))
+    device:emit_event(lockGetUser.nextUserIndex("null", {state_change = true}))
   end
 end
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------
+-- Lock Add Pin --
+------------------
+local function handle_add_pin_set_cred_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_pin_set_cred_index !!!!!!!!!!!!!"))
+
+  local credIndex = command.args.credIndex
+  log.info_with({hub_logs=true}, string.format("credIndex: %s", credIndex))
+  device:emit_event(lockAddPin.credIndex(credIndex, {state_change = true}))
+end
+
+local function handle_add_pin_set_pin(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_pin_set_pin !!!!!!!!!!!!!"))
+
+  local pin = command.args.pin
+  log.info_with({hub_logs=true}, string.format("pin: %s", pin))
+  device:emit_event(lockAddPin.pin(pin, {state_change = true}))
+end
+
+local function handle_add_pin_set_user_index(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_pin_set_user_index !!!!!!!!!!!!!"))
+
+  local userIndex = command.args.userIndex
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIndex))
+  device:emit_event(lockAddPin.userIndex(userIndex, {state_change = true}))
+end
+
+local function handle_add_pin_set_user_type(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_pin_set_user_type !!!!!!!!!!!!!"))
+
+  local userType = command.args.userType
+  log.info_with({hub_logs=true}, string.format("userType: %s", userType))
+  device:emit_event(lockAddPin.userType(userType, {state_change = true}))
+end
+
+local function handle_add_pin(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_pin !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local credIndex = device:get_latest_state("main", lockAddPinID, lockAddPin.credIndex.NAME)
+  credIndex = math.tointeger(credIndex)
+  local pin = device:get_latest_state("main", lockAddPinID, lockAddPin.pin.NAME)
+  local userIndex = device:get_latest_state("main", lockAddPinID, lockAddPin.userIndex.NAME)
+  userIndex = math.tointeger(userIndex)
+  local userType = device:get_latest_state("main", lockAddPinID, lockAddPin.userType.NAME)
+  for typeInteger, typeString in pairs(USER_TYPE_MAP) do
+    if userType == typeString then
+      userType = typeInteger
+      break
+    end
+  end
+  log.info_with({hub_logs=true}, string.format(
+    "credIndex: %s, pin: %s, userIndex: %s, userType: %s",
+    credIndex, pin, userIndex, userType
+  ))
+
+  local credential = {credential_type = DoorLock.types.CredentialTypeEnum.PIN, credential_index = credIndex}
+  device:send(
+    DoorLock.server.commands.SetCredential(
+      device, ep,
+      0,           -- Data Operation Type: Add(0), Modify(2)
+      credential,  -- Credential
+      pin,         -- Credential Data
+      userIndex,   -- User Index
+      nil,         -- User Status
+      nil     -- User Type
+    )
+  )
+end
+
+local function set_credential_response_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_credential_response_handler !!!!!!!!!!!!!"))
+
+  local elements = ib.info_block.data.elements
+  if ib.status ~= im.InteractionResponse.Status.SUCCESS then
+    device.log.error("Failed to set pin for device")
+    return
+  end
+
+  local ep = find_default_endpoint(device, DoorLock.ID)
+  if elements.status.value == 0 then -- Success
+    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_credential_response_handler: succcess !!!!!!!!!!!!!"))
+    -- Set User Name
+    -- local userIdx = elements.user_index.value
+    -- local userNum = device:get_field(lock_utils.USER_NUM) + 1
+    -- local userNumForIdx = device:get_field(lock_utils.USER_INDEX_FOR_NAME) + 1
+    -- local userName = "USER" .. userNumForIdx
+    -- add_user_to_table(device, userIdx, userName)
+    -- print_user_table(device)
+    -- device:set_field(lock_utils.USER_NUM, userNum, {persist = true})
+    -- device:set_field(lock_utils.USER_INDEX_FOR_NAME, userNumForIdx, {persist = true})
+
+    -- Add Credential to table
+    -- local credential = device:get_field(lock_utils.CRED_INDEX_SETTING)
+    -- add_cred_to_table(
+    --   device,
+    --   credential.credential_index,
+    --   credential.credential_type,
+    --   userIdx
+    -- )
+    -- print_cred_table(device)
+
+    -- Add Schedule to door lock and table
+    -- local userType = device:get_field(lock_utils.ADD_USER_TYPE)
+    -- if userType == DoorLock.types.DlUserType.YEAR_DAY_SCHEDULE_USER then
+    --   log.info_with({hub_logs=true}, string.format("!!!!! Set Year Day Schedule !!!!!"))
+    --   local start_time = os.time{
+    --     year = math.random(2020, 2023),
+    --     month = math.random(12),
+    --     day = math.random(28)
+    --   }
+    --   local end_time = os.time() + 600 -- 10 minutes from current
+    --   device:send(
+    --     DoorLock.server.commands.SetYearDaySchedule(
+    --       device, ep,
+    --       1, userIdx,
+    --       start_time, end_time
+    --     )
+    --   )
+    -- elseif userType == DoorLock.types.DlUserType.WEEK_DAY_SCHEDULE_USER then
+    --   log.info_with({hub_logs=true}, string.format("!!!!! Set Week Day Schedule !!!!!"))
+    --   local dayMask = math.random(127)
+    --   local start_hour = math.random(10)
+    --   local start_minute = math.random(60)
+    --   local end_hour = start_hour + 12
+    --   local end_minute = start_minute
+    --   device:send(
+    --     DoorLock.server.commands.SetWeekDaySchedule(
+    --       device, ep,
+    --       1, userIdx,
+    --       dayMask, start_hour, start_minute, end_hour, end_minute
+    --     )
+    --   )
+    -- end
+    -- device:send(DoorLock.server.commands.GetWeekDaySchedule(device, ep, 1, 2))
+    -- device:send(DoorLock.server.commands.GetWeekDaySchedule(device, ep, 1, 3))
+    return
+  end
+
+  -- @field public byte_length number 1
+  -- @field public SUCCESS number 0
+  -- @field public FAILURE number 1
+  -- @field public DUPLICATE number 2
+  -- @field public OCCUPIED number 3
+  -- @field public INVALID_FIELD number 133
+  -- @field public RESOURCE_EXHAUSTED number 137
+  -- @field public NOT_FOUND number 139
+ 
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_credential_response_handler: failure !!!!!!!!!!!!!"))
+  local result = "Failure"
+  if elements.status.value = DoorLock.types.DlStatus.FAILURE then
+    result = "Failure"
+  elseif elements.status.value = DoorLock.types.DlStatus.DUPLICATE then
+    result = "Failure"
+  elseif elements.status.value = DoorLock.types.DlStatus.OCCUPIED then
+    result = "Failure"
+  elseif elements.status.value = DoorLock.types.DlStatus.INVALID_FIELD then
+    result = "Failure"
+  elseif elements.status.value = DoorLock.types.DlStatus.RESOURCE_EXHAUSTED then
+    result = "Failure"
+  elseif elements.status.value = DoorLock.types.DlStatus.NOT_FOUND then
+    result = "Failure"
+  end
+  log.info_with({hub_logs=true}, string.format("Result: %s", result))
+  log.info_with({hub_logs=true}, string.format("Next Credential Index %s", elements.next_credential_index.value))
+end
 
 
 
@@ -1148,6 +1333,7 @@ local matter_lock_driver = {
     cmd_response = {
       [DoorLock.ID] = {
         [DoorLock.client.commands.GetUserResponse.ID] = get_user_response_handler,
+        [DoorLock.client.commands.SetCredentialResponse.ID] = set_credential_response_handler,
         -- [DoorLock.client.commands.GetCredentialStatusResponse.ID] = get_credential_status_response_handler,
       },
     },
@@ -1208,6 +1394,13 @@ local matter_lock_driver = {
       [lockGetUser.commands.setUserIndex.NAME] = handle_get_user_set_user_index,
       [lockGetUser.commands.getUser.NAME] = handle_get_user,
     },
+    [lockAddPinID] = {
+      [lockAddPin.commands.setCredIndex.NAME] = handle_add_pin_set_cred_index,
+      [lockAddPin.commands.setPin.NAME] = handle_add_pin_set_pin,
+      [lockAddPin.commands.setUserIndex.NAME] = handle_add_pin_set_user_index,
+      [lockAddPin.commands.setUserType.NAME] = handle_add_pin_set_user_type,
+      [lockAddPin.commands.addPin.NAME] = handle_add_pin,
+    },
     -- [lockPinCodeID] = {
     --   [lockPinCode.commands.lockWithPinCode.NAME] = handle_lock_with_pin_code,
     --   [lockPinCode.commands.unlockWithPinCode.NAME] = handle_unlock_with_pin_code,
@@ -1218,14 +1411,6 @@ local matter_lock_driver = {
     --   [lockSetUser.commands.setUserName.NAME] = handle_set_user_name,
     --   [lockSetUser.commands.setUserUniqueID.NAME] = handle_set_user_unique_id,
     --   [lockSetUser.commands.setUserType.NAME] = handle_set_user_type,
-    -- },
-    -- [lockSetCredID] = {
-    --   [lockSetCred.commands.setDataOperationType.NAME] = handle_cred_set_data_operation_type,
-    --   [lockSetCred.commands.setUserType.NAME] = handle_cred_set_user_type,
-    --   [lockSetCred.commands.setCredType.NAME] = handle_set_cred_type,
-    --   [lockSetCred.commands.setUserIndex.NAME] = handle_cred_set_user_index,
-    --   [lockSetCred.commands.setCredIndex.NAME] = handle_set_cred_index,
-    --   [lockSetCred.commands.setCredData.NAME] = handle_set_cred_data,
     -- },
     -- [lockGetCredID] = {
     --   [lockGetCred.commands.setCredType.NAME] = handle_set_cred_type_for_get,
@@ -1243,11 +1428,11 @@ local matter_lock_driver = {
     lockModifyUser,
     lockClearUser,
     lockGetUser,
+    lockAddPin,
     -- lockPinCode,
     -- lockStatus,
     -- lockStatusForPin,
     -- lockStatusForUser,
-    -- lockSetCredential,
     -- lockGetCred,
   },
 }
