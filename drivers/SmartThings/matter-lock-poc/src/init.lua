@@ -24,6 +24,8 @@ local lock_utils = require "lock_utils"
 
 local DoorLock = clusters.DoorLock
 
+local lockWithPinID = "insideimage13541.newLockWithPin"
+local lockWithPin = capabilities[lockWithPinID]
 local lockAddUserID = "insideimage13541.newLockAddUser"
 local lockAddUser = capabilities[lockAddUserID]
 local lockModifyUserID = "insideimage13541.newLockModifyUser"
@@ -41,16 +43,12 @@ local lockClearPin = capabilities[lockClearPinID]
 local lockGetPinID = "insideimage13541.newLockGetPin"
 local lockGetPin = capabilities[lockGetPinID]
 
--- local lockPinCodeID = "insideimage13541.lockPinCode10"
--- local lockPinCode = capabilities[lockPinCodeID]
 -- local lockStatusID = "insideimage13541.lockStatus1"
 -- local lockStatus = capabilities[lockStatusID]
 -- local lockStatusForPinID = "insideimage13541.lockStatusForPin1"
 -- local lockStatusForPin = capabilities[lockStatusForPinID]
 -- local lockStatusForUserID = "insideimage13541.lockStatusForUser3"
 -- local lockStatusForUser = capabilities[lockStatusForUserID]
--- local lockGetCredID = "insideimage13541.lockGetCredentialStatus3"
--- local lockGetCred = capabilities[lockGetCredID]
 
 local USER_STATUS_MAP = {
   [0] = "",
@@ -119,47 +117,6 @@ local function device_init(driver, device)
   device:emit_event(lockModifyUser.userType.unrestrictedUser({state_change = true}))
   device:emit_event(lockAddPin.userType.unrestrictedUser({state_change = true}))
 
-  -- local opTypeTable = {
-  --   lockSetUser.dataOperationType.add.NAME,
-  --   lockSetUser.dataOperationType.modify.NAME,
-  -- }
-  -- device:emit_event_for_endpoint(ep, lockSetUser.supportedDataOperationType(opTypeTable))
-  -- device:emit_event_for_endpoint(ep, lockSetUser.dataOperationType(lockSetUser.dataOperationType.select.NAME, {visibility = {displayed = false}}))
-  -- device:emit_event_for_endpoint(ep, lockSetCred.supportedDataOperationType(opTypeTable))
-  -- device:emit_event_for_endpoint(ep, lockSetCred.dataOperationType(lockSetCred.dataOperationType.select.NAME, {visibility = {displayed = false}}))
-
-  -- local userType = lockSetUser.userType
-  -- local userTypeTable = {
-  --   userType.unrestricted.NAME,
-  --   userType.yearDayScheduleUser.NAME,
-  --   userType.weekDayScheduleUser.NAME,
-  --   userType.programmingUser.NAME,
-  --   userType.nonAccessUser.NAME,
-  --   userType.forcedUser.NAME,
-  --   userType.disposableUser.NAME,
-  --   userType.expiringUser.NAME,
-  --   userType.scheduleRestrictedUser.NAME,
-  --   userType.remoteOnlyUser.NAME,
-  -- }
-  -- device:emit_event_for_endpoint(ep, lockSetUser.supportedUserType(userTypeTable))
-  -- device:emit_event_for_endpoint(ep, lockSetUser.userType(lockSetUser.userType.select.NAME, {visibility = {displayed = false}}))
-  -- device:emit_event_for_endpoint(ep, lockSetCred.supportedUserType(userTypeTable))
-  -- device:emit_event_for_endpoint(ep, lockSetCred.userType(lockSetCred.userType.select.NAME, {visibility = {displayed = false}}))
-
-  -- local credType = lockSetCred.credType
-  -- local credTypeTable = {
-  --   credType.programmingPin.NAME,
-  --   credType.pin.NAME,
-  --   credType.rfid.NAME,
-  --   credType.fingerprint.NAME,
-  --   credType.fingerVein.NAME,
-  --   credType.face.NAME,
-  -- }
-  -- device:emit_event_for_endpoint(ep, lockSetCred.supportedCredType(credTypeTable))
-  -- device:emit_event_for_endpoint(ep, lockSetCred.credType(lockSetCred.credType.select.NAME, {visibility = {displayed = false}}))
-  -- device:emit_event_for_endpoint(ep, lockGetCred.supportedCredType(credTypeTable))
-  -- device:emit_event_for_endpoint(ep, lockGetCred.credType(lockSetCred.credType.select.NAME, {visibility = {displayed = false}}))
-
   -- User Data Hard coding
   device:send(DoorLock.server.commands.SetUser(device, ep, 0, 1, nil, nil, nil, nil, nil))
   local credential = {credential_type = 1, credential_index = 1}
@@ -187,19 +144,21 @@ local function lock_state_handler(driver, device, ib, response)
   local LockState = DoorLock.attributes.LockState
   if ib.data.value == LockState.NOT_FULLY_LOCKED then
     -- device:emit_event(lockStatus.lockState.notFullyLocked())
-    device:emit_event(capabilities.lock.lock.unknown())
+    device:emit_event(capabilities.lock.lock.unknown({state_change = true}))
   elseif ib.data.value == LockState.LOCKED then
     -- device:emit_event(lockStatus.lockState.locked())
-    device:emit_event(capabilities.lock.lock.locked())
+    device:emit_event(capabilities.lock.lock.locked({state_change = true}))
+    device:emit_event(lockWithPin.lock.locked({state_change = true}))
   elseif ib.data.value == LockState.UNLOCKED then
     -- device:emit_event(lockStatus.lockState.unlocked())
-    device:emit_event(capabilities.lock.lock.unlocked())
+    device:emit_event(capabilities.lock.lock.unlocked({state_change = true}))
+    device:emit_event(lockWithPin.lock.unlocked({state_change = true}))
   elseif ib.data.value == LockState.UNLATCHED then
     -- device:emit_event(lockStatus.lockState.unlatched())
-    device:emit_event(capabilities.lock.lock.locked())
+    device:emit_event(capabilities.lock.lock.locked({state_change = true}))
   else
     -- device:emit_event(lockStatus.lockState.locked())
-    device:emit_event(capabilities.lock.lock.locked())
+    device:emit_event(capabilities.lock.lock.locked({state_change = true}))
   end
 end
 
@@ -469,21 +428,33 @@ end
 --------------------------
 -- Lock/Unlock with Pin --
 --------------------------
--- local function handle_lock_with_pin_code(driver, device, command)
---   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_lock_with_pin_code: %s !!!!!!!!!!!!!", command.args.pinCode))
---   local ep = device:component_to_endpoint(command.component)
---   device:send(DoorLock.server.commands.LockDoor(device, ep, command.args.pinCode))
---   device:emit_event(lockPinCode.lockPinCode("", {visibility = {displayed = false}}))
---   device:emit_event(lockPinCode.lockPinCode(command.args.pinCode, {visibility = {displayed = false}}))
--- end
+local function handle_lock_with_pin_set_pin(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_lock_with_pin_set_pin !!!!!!!!!!!!!"))
 
--- local function handle_unlock_with_pin_code(driver, device, command)
---   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_unlock_with_pin_code: %s !!!!!!!!!!!!!", command.args.pinCode))
---   local ep = device:component_to_endpoint(command.component)
---   device:send(DoorLock.server.commands.UnlockDoor(device, ep, command.args.pinCode))
---   device:emit_event(lockPinCode.unlockPinCode("", {visibility = {displayed = false}}))
---   device:emit_event(lockPinCode.unlockPinCode(command.args.pinCode, {visibility = {displayed = false}}))
--- end
+  local pin = command.args.pin
+  log.info_with({hub_logs=true}, string.format("pin: %s", pin))
+  device:emit_event(lockWithPin.pin(pin, {state_change = true}))
+end
+
+local function handle_lock_with_pin(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_lock_with_pin!!!!!!!!!!!!!"))
+
+  local ep = device:component_to_endpoint(command.component)
+  local pin = device:get_latest_state("main", lockWithPinID, lockWithPin.pin.NAME)
+  log.info_with({hub_logs=true}, string.format("pin: %s", pin))
+
+  device:send(DoorLock.server.commands.LockDoor(device, ep, pin))
+end
+
+local function handle_unlock_with_pin(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_unlock_with_pin !!!!!!!!!!!!!"))
+  
+  local ep = device:component_to_endpoint(command.component)
+  local pin = device:get_latest_state("main", lockWithPinID, lockWithPin.pin.NAME)
+  log.info_with({hub_logs=true}, string.format("pin: %s", pin))
+
+  device:send(DoorLock.server.commands.UnlockDoor(device, ep, pin))
+end
 
 -------------------
 -- Lock Add User --
@@ -834,7 +805,7 @@ end
 
 local function handle_modify_pin(driver, device, command)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_modify_pin !!!!!!!!!!!!!"))
-  
+
   local ep = device:component_to_endpoint(command.component)
   local userIndex = device:get_latest_state("main", lockModifyPinID, lockModifyPin.userIndex.NAME)
   userIndex = math.tointeger(userIndex)
@@ -1073,7 +1044,12 @@ local matter_lock_driver = {
     },
   },
   subscribed_attributes = {
-    [capabilities.lock.ID] = {DoorLock.attributes.LockState},
+    [capabilities.lock.ID] = {
+      DoorLock.attributes.LockState
+    },
+    [lockWithPinID] = {
+      DoorLock.attributes.LockState
+    },
     -- [lockStatusID] = {
     --   DoorLock.attributes.LockState,
     --   DoorLock.attributes.LockType,
@@ -1109,10 +1085,11 @@ local matter_lock_driver = {
       [capabilities.lock.commands.lock.NAME] = handle_lock,
       [capabilities.lock.commands.unlock.NAME] = handle_unlock,
     },
-    -- [lockPinCodeID] = {
-    --   [lockPinCode.commands.lockWithPinCode.NAME] = handle_lock_with_pin_code,
-    --   [lockPinCode.commands.unlockWithPinCode.NAME] = handle_unlock_with_pin_code,
-    -- },
+    [lockWithPinID] = {
+      [lockWithPin.commands.setPin.NAME] = handle_lock_with_pin_set_pin,
+      [lockWithPin.commands.lock.NAME] = handle_lock_with_pin,
+      [lockWithPin.commands.unlock.NAME] = handle_unlock_with_pin,
+    },
     [lockAddUserID] = {
       [lockAddUser.commands.setUserIndex.NAME] = handle_add_user_set_user_index,
       [lockAddUser.commands.setUserType.NAME] = handle_add_user_set_user_type,
@@ -1157,7 +1134,7 @@ local matter_lock_driver = {
   },
   supported_capabilities = {
     capabilities.lock,
-    -- lockPinCode,
+    lockWithPin,
     lockAddUser,
     lockModifyUser,
     lockClearUser,

@@ -4,6 +4,9 @@ components:
   capabilities:
   - id: lock
     version: 1
+  - id: insideimage13541.newLockWithPin
+    version: 1
+  #
   - id: insideimage13541.newLockGetUser
     version: 1
   - id: insideimage13541.newLockGetPin
