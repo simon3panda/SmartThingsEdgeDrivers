@@ -434,6 +434,309 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------
+-- Add User --
+--------------
+local function add_user_to_table(device, userIdx, usrType)
+  local user_table = device:get_latest_state(
+    "main",
+    capabilities.lockUsers.ID,
+    capabilities.lockUsers.users.NAME
+  ) or {}
+
+  table.insert(user_table, {userIndex = userIdx, userType = usrType})
+  device:emit_event(capabilities.lockUsers.users(user_table))
+end
+
+local function update_user_in_table(device, userIdx, usrType)
+  -- get latest user table
+  local user_table = device:get_latest_state(
+    "main",
+    capabilities.lockUsers.ID,
+    capabilities.lockUsers.users.NAME
+  ) or {}
+
+  -- find user entry
+  local i = 0
+  for index, entry in pairs(user_table) do
+    if entry.userIndex == userIdx then
+      i = index
+    end
+  end
+
+  -- update user entry
+  if i ~= 0 then
+    user_table[i].userType = usrType
+    device:emit_event(capabilities.lockUsers.users(user_table))
+  end
+end
+
+local function delete_user_from_table(device, userIdx)
+  if userIdx == ALL_INDEX then
+    device:emit_event(capabilities.lockUsers.users({}))
+  end
+  -- get latest user table
+  local user_table = device:get_latest_state(
+    "main",
+    capabilities.lockUsers.ID,
+    capabilities.lockUsers.users.NAME
+  ) or {}
+
+  -- find user entry
+  local i = 0
+  for index, entry in pairs(user_table) do
+    if entry.userIndex == userIdx then
+      i = index
+    end
+  end
+
+  -- delete user entry
+  if i ~= 0 then
+    table.remove(user_table, i)
+    device:emit_event(capabilities.lockUsers.users(user_table))
+  end
+end
+
+local function handle_add_user(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_add_user !!!!!!!!!!!!!"))
+
+  local cmdName = "addUser"
+  local userName = command.args.userName
+  local userType = command.args.lockUserType
+
+  log.info_with({hub_logs=true}, string.format("commandName: %s", cmdName))
+  log.info_with({hub_logs=true}, string.format("userName: %s", userName))
+  log.info_with({hub_logs=true}, string.format("userType: %s", userType))
+end
+
+-----------------
+-- Update User --
+-----------------
+local function handle_update_user(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_update_user !!!!!!!!!!!!!"))
+
+  -- Get parameters
+  local cmdName = "updateUser"
+  local userIdx = command.args.userIndex
+  local userName = command.args.userName
+  local userType = command.args.lockUserType
+
+  -- Check busy state
+  local busy = device:get_field(lock_utils.BUSY_STATE)
+  if busy == true then
+    local result = {
+      commandName = cmdName,
+      statusCode = "busy"
+    }
+    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    device:emit_event(event)
+    return
+  end
+
+  -- Save values to field
+  device:set_field(lock_utils.BUSY_STATE, true, {persist = true})
+  device:set_field(lock_utils.COMMAND_NAME, cmdName, {persist = true})
+  device:set_field(lock_utils.USER_INDEX, userIdx, {persist = true})
+  device:set_field(lock_utils.USER_TYPE, userType, {persist = true})
+
+  log.info_with({hub_logs=true}, string.format("commandName: %s", cmdName))
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIdx))
+  log.info_with({hub_logs=true}, string.format("userName: %s", userName))
+  log.info_with({hub_logs=true}, string.format("userType: %s", userType))
+
+  -- Send command
+  local ep = device:component_to_endpoint(command.component)
+  device:send(
+    DoorLock.server.commands.SetUser(
+      device, ep,
+      DoorLock.types.DlDataOperationType.MODIFY, -- Operation Type: Add(0), Modify(2)
+      userIdx,    -- User Index
+      userName,   -- User Name
+      nil,        -- Unique ID
+      nil,        -- User Status
+      userType,   -- User Type
+      nil         -- Credential Rule
+    )
+  )
+end
+
+-----------------------
+-- Set User Response --
+-----------------------
+local function set_user_response_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_user_response_handler !!!!!!!!!!!!!"))
+
+  -- Get result
+  local cmdName = device:get_field(lock_utils.COMMAND_NAME)
+  local userIdx = device:get_field(lock_utils.USER_INDEX)
+  local userType = device:get_field(lock_utils.USER_TYPE)
+  local status = "success"
+  if ib.status == DoorLock.types.DlStatus.FAILURE then
+    status = "failure"
+  elseif ib.status == DoorLock.types.DlStatus.OCCUPIED then
+    status = "occupied"
+  elseif ib.status == DoorLock.types.DlStatus.INVALID_FIELD then
+    status = "invalidCommand"
+  end
+  
+  -- Update User in table
+  if status == "success" then
+    if cmdName == "addUser" then
+      add_user_to_table(device, userIdx, userType)
+    elseif cmdName == "updateUser"
+      update_user_in_table(device, userIdx, userType)
+    end
+  end
+
+  -- Update commandResult
+  local result = {
+    commandName = cmdName,
+    userIndex = userIdx,
+    statusCode = status
+  }
+  local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+  device:emit_event(event)
+  device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
+end
+
+-----------------
+-- Delete User --
+-----------------
+local function handle_delete_user(device, userIdx)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_delete_user !!!!!!!!!!!!!"))
+
+  -- Get parameters
+  local cmdName = "deleteUser"
+  -- local userIdx = command.args.userIndex
+
+  -- Check busy state
+  local busy = device:get_field(lock_utils.BUSY_STATE)
+  if busy == true then
+    local result = {
+      commandName = cmdName,
+      statusCode = "busy"
+    }
+    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    device:emit_event(event)
+    return
+  end
+
+  -- Save values to field
+  device:set_field(lock_utils.BUSY_STATE, true, {persist = true})
+  device:set_field(lock_utils.COMMAND_NAME, cmdName, {persist = true})
+  device:set_field(lock_utils.USER_INDEX, userIdx, {persist = true})
+
+  log.info_with({hub_logs=true}, string.format("commandName: %s", cmdName))
+  log.info_with({hub_logs=true}, string.format("userIndex: %s", userIdx))
+
+  -- Send command
+  local ep = device:component_to_endpoint(command.component)
+  device:send(DoorLock.server.commands.ClearUser(device, ep, userIndex))
+end
+
+----------------------
+-- Delete All Users --
+----------------------
+local function handle_delete_all_users(driver, device, command)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_delete_all_users !!!!!!!!!!!!!"))
+
+  -- Get parameters
+  local cmdName = "deleteAllUsers"
+
+  -- Check busy state
+  local busy = device:get_field(lock_utils.BUSY_STATE)
+  if busy == true then
+    local result = {
+      commandName = cmdName,
+      statusCode = "busy"
+    }
+    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    device:emit_event(event)
+    return
+  end
+
+  -- Save values to field
+  device:set_field(lock_utils.BUSY_STATE, true, {persist = true})
+  device:set_field(lock_utils.COMMAND_NAME, cmdName, {persist = true})
+  device:set_field(lock_utils.USER_INDEX, ALL_INDEX, {persist = true})
+
+  log.info_with({hub_logs=true}, string.format("commandName: %s", cmdName))
+
+  -- Send command
+  device:send(DoorLock.server.commands.ClearUser(device, ep, ALL_INDEX))
+end
+
+-------------------------
+-- Clear User Response --
+-------------------------
+local function clear_user_response_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! clear_user_response_handler !!!!!!!!!!!!!"))
+
+  -- Get result
+  local cmdName = device:get_field(lock_utils.COMMAND_NAME)
+  local userIdx = device:get_field(lock_utils.USER_INDEX)
+  local status = "success"
+  if ib.status == DoorLock.types.DlStatus.FAILURE then
+    status = "failure"
+  elseif ib.status == DoorLock.types.DlStatus.INVALID_FIELD then
+    status = "invalidCommand"
+  end
+
+  -- Delete User in table
+  if status == "success" then
+    delete_user_from_table(device, userIdx)
+  end
+
+  -- Update commandResult
+  local result = {
+    commandName = cmdName,
+    userIndex = userIdx,
+    statusCode = status
+  }
+  local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+  device:emit_event(event)
+  device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- Capability Handler
 -----------------
 -- Lock/Unlock --
@@ -527,6 +830,17 @@ local function handle_add_user(driver, device, command)
       nil         -- Credential Rule
     )
   )
+end
+
+local function set_user_response_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_user_response_handler !!!!!!!!!!!!!"))
+end
+
+local function clear_user_response_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! clear_user_response_handler !!!!!!!!!!!!!"))
+
+
+  log.info_with({hub_logs=true}, string.format("ib.status: %s", ib.status))
 end
 
 ----------------------
@@ -863,10 +1177,10 @@ local function set_credential_response_handler(driver, device, ib, response)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! set_credential_response_handler !!!!!!!!!!!!!"))
 
   local elements = ib.info_block.data.elements
-  if ib.status ~= im.InteractionResponse.Status.SUCCESS then
-    device.log.error("Failed to set pin for device")
-    return
-  end
+  -- if ib.status ~= im.InteractionResponse.Status.SUCCESS then
+  --   device.log.error("Failed to set pin for device")
+  --   return
+  -- end
 
   local ep = find_default_endpoint(device, DoorLock.ID)
   if elements.status.value == 0 then -- Success
@@ -898,6 +1212,7 @@ local function set_credential_response_handler(driver, device, ib, response)
   elseif elements.status.value == DoorLock.types.DlStatus.NOT_FOUND then
     result = "Not Found"
   end
+  log.info_with({hub_logs=true}, string.format("ib.status: %s", ib.status))
   log.info_with({hub_logs=true}, string.format("Result: %s", result))
   log.info_with({hub_logs=true}, string.format("Next Credential Index %s", elements.next_credential_index.value))
 end
@@ -1489,6 +1804,8 @@ local matter_lock_driver = {
     -- },
     cmd_response = {
       [DoorLock.ID] = {
+        [DoorLock.server.commands.SetUser.ID] = set_user_response_handler,
+        [DoorLock.server.commands.ClearUser.ID] = clear_user_response_handler,
         [DoorLock.client.commands.GetUserResponse.ID] = get_user_response_handler,
         [DoorLock.client.commands.SetCredentialResponse.ID] = set_credential_response_handler,
         [DoorLock.client.commands.GetCredentialStatusResponse.ID] = get_credential_status_response_handler,
