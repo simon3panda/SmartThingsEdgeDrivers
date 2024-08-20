@@ -48,6 +48,26 @@ end
 
 local function do_configure(driver, device)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! do_configure !!!!!!!!!!!!!"))
+
+  local user_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.USER})
+  local pin_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.PIN_CREDENTIAL})
+  local week_schedule_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.WEEK_DAY_ACCESS_SCHEDULES})
+  local year_schedule_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.YEAR_DAY_ACCESS_SCHEDULES})
+
+  local profile_name = "lock"
+  if #user_eps > 0 then
+    profile_name = profile_name .. "-user"
+    if #pin_eps > 0 then
+      profile_name = profile_name .. "-pin"
+    end
+    if #week_schedule_eps + #year_schedule_eps > 0 then
+      profile_name = profile_name .. "-schedule"
+    end
+  else
+    profile_name = "base-lock"
+  end
+  device.log.info_with({hub_logs=true}, string.format("Updating device profile to %s.", profile_name))
+  device:try_update_metadata({profile = profile_name})
 end
 
 local function device_init(driver, device)
@@ -56,19 +76,12 @@ local function device_init(driver, device)
   device:subscribe()
 end
 
-
-
-
-
-
-
-
-
-
-
 -- Matter Handler
+----------------
+-- Lock State --
+----------------
 local function lock_state_handler(driver, device, ib, response)
-  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! lock_state_handler: %s !!!!!!!!!!!!!", ib.data.value))
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! lock_state_handler !!!!!!!!!!!!!"))
   local LockState = DoorLock.attributes.LockState
   if ib.data.value == LockState.NOT_FULLY_LOCKED then
     device:emit_event(capabilities.lock.lock.not_fully_locked({state_change = true}))
@@ -83,6 +96,30 @@ local function lock_state_handler(driver, device, ib, response)
   end
 end
 
+---------------------
+-- Operating Modes --
+---------------------
+local function operating_modes_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! operating_modes_handler!!!!!!!!!!!!!"))
+
+  local status = capabilities.remoteControlStatus.remoteControlEnabled
+  local op_type = DoorLock.types.OperatingModeEnum
+  local opMode_map = {
+    [op_type.NORMAL] = true,
+    [op_type.VACATION] = true,
+    [op_type.PRIVACY] = false,
+    [op_type.NO_REMOTE_LOCK_UNLOCK] = false,
+    [op_type.PASSAGE] = false,
+  }
+  local result = opMode_map[ib.data.value]
+  if result == true then
+    device:emit_event(status("true", {visibility = {displayed = true}}))
+    device:emit_event(capabilities.lock.supportedLockCommands({"lock", "unlock"}))
+  elseif result == false then
+    device:emit_event(status("false", {visibility = {displayed = true}}))
+    device:emit_event(capabilities.lock.supportedLockCommands({}))
+  end
+end
 -------------------------------------
 -- Number Of Total Users Supported --
 ------------------------------------- 
@@ -145,7 +182,9 @@ local function set_cota_credential(device, credential_index)
   local credential = {credential_type = DoorLock.types.DlCredentialType.PIN, credential_index = credential_index}
   -- Set the credential to a code
   device:set_field(lock_utils.COMMAND_NAME, "addCredential")
+  device:set_field(lock_utils.CRED_INDEX, credential_index)
   device:set_field(lock_utils.SET_CREDENTIAL, credential_index)
+  device:set_field(lock_utils.USER_TYPE, "adminMember")
   device.log.info(string.format("Attempting to set COTA credential at index %s", credential_index))
   device:send(DoorLock.server.commands.SetCredential(
     device,
@@ -163,6 +202,7 @@ local function generate_cota_cred_for_device(device)
   local len = device:get_latest_state("main", capabilities.lockCredentials.ID, capabilities.lockCredentials.maxPinCodeLen.NAME) or 6
   local cred_data = math.floor(math.random() * (10 ^ len))
   cred_data = string.format("%0" .. tostring(len) .. "d", cred_data)
+  log.info_with({hub_logs=true}, string.format("cota_cred: %s", cred_data))
   device:set_field(lock_utils.COTA_CRED, cred_data, {persist = true})
 end
 
@@ -205,15 +245,6 @@ local function max_year_schedule_of_user_handler(driver, device, ib, response)
   device:emit_event(capabilities.lockSchedules.yearDaySchedulesPerUser(ib.data.value, {visibility = {displayed = false}}))
 end
 
-
-
-
-
-
-
-
-
-
 -- Capability Handler
 -----------------
 -- Lock/Unlock --
@@ -222,6 +253,7 @@ local function handle_lock(driver, device, command)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_lock !!!!!!!!!!!!!"))
   local ep = device:component_to_endpoint(command.component)
   local cota_cred = device:get_field(lock_utils.COTA_CRED)
+  log.info_with({hub_logs=true}, string.format("cota_cred: %s", cota_cred))
   if cota_cred then
     device:send(
       DoorLock.server.commands.LockDoor(device, ep, cota_cred)
@@ -235,6 +267,7 @@ local function handle_unlock(driver, device, command)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! handle_unlock !!!!!!!!!!!!!"))
   local ep = device:component_to_endpoint(command.component)
   local cota_cred = device:get_field(lock_utils.COTA_CRED)
+  log.info_with({hub_logs=true}, string.format("cota_cred: %s", cota_cred))
   if cota_cred then
     device:send(
       DoorLock.server.commands.UnlockDoor(device, ep, cota_cred)
@@ -249,6 +282,8 @@ end
 ----------------
 local function add_user_to_table(device, userIdx, usrType)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_user_to_table !!!!!!!!!!!!!"))
+  log.info_with({hub_logs=true}, string.format("userIdx: %s", userIdx))
+  log.info_with({hub_logs=true}, string.format("usrType: %s", usrType))
 
   -- Get latest user table
   local user_table = device:get_latest_state(
@@ -264,7 +299,7 @@ local function add_user_to_table(device, userIdx, usrType)
   end
 
   -- Add new entry to table
-  table.insert(new_user_table, {userIndex = userIdx, lockUserType = usrType})
+  table.insert(new_user_table, {userIndex = userIdx, userType = usrType})
   device:emit_event(capabilities.lockUsers.users(new_user_table))
 end
 
@@ -290,7 +325,7 @@ local function update_user_in_table(device, userIdx, usrType)
 
   -- Update user entry
   if i ~= 0 then
-    new_user_table[i].lockUserType = usrType
+    new_user_table[i].userType = usrType
     device:emit_event(capabilities.lockUsers.users(new_user_table))
   end
 end
@@ -338,7 +373,7 @@ local function handle_add_user(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
@@ -391,7 +426,7 @@ local function handle_update_user(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
@@ -461,7 +496,7 @@ local function set_user_response_handler(driver, device, ib, response)
 
   -- Update commandResult
   local result = {
-    requestId = cmdName,
+    commandName = cmdName,
     userIndex = userIdx,
     statusCode = status
   }
@@ -484,7 +519,7 @@ local function handle_delete_user(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
@@ -518,7 +553,7 @@ local function handle_delete_all_users(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
@@ -560,7 +595,7 @@ local function clear_user_response_handler(driver, device, ib, response)
 
   -- Update commandResult
   local result = {
-    requestId = cmdName,
+    commandName = cmdName,
     userIndex = userIdx,
     statusCode = status
   }
@@ -631,10 +666,9 @@ local function handle_add_credential(driver, device, command)
     userIdx = nil
   end
   local userType = command.args.userType
+  local userTypeMatter = DoorLock.types.UserTypeEnum.UNRESTRICTED_USER
   if userType == "guest" then
     userType = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
-  else
-    userType = DoorLock.types.UserTypeEnum.UNRESTRICTED_USER
   end
   local credential = {
     credential_type = DoorLock.types.CredentialTypeEnum.PIN,
@@ -646,7 +680,7 @@ local function handle_add_credential(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
@@ -674,11 +708,11 @@ local function handle_add_credential(driver, device, command)
     DoorLock.server.commands.SetCredential(
       device, ep,
       DoorLock.types.DlDataOperationType.ADD, -- Data Operation Type: Add(0), Modify(2)
-      credential,  -- Credential
-      credData,    -- Credential Data
-      userIdx,     -- User Index
-      nil,         -- User Status
-      userType     -- User Type
+      credential,     -- Credential
+      credData,       -- Credential Data
+      userIdx,        -- User Index
+      nil,            -- User Status
+      userTypeMatter  -- User Type
     )
   )
 end
@@ -703,7 +737,7 @@ local function handle_update_credential(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
@@ -749,19 +783,31 @@ local function set_credential_response_handler(driver, device, ib, response)
   end
 
   local cmdName = device:get_field(lock_utils.COMMAND_NAME)
+  local userIdx = device:get_field(lock_utils.USER_INDEX)
   local credIdx = device:get_field(lock_utils.CRED_INDEX)
   local status = "success"
+
+  log.info_with({hub_logs=true}, string.format("cmdName: %s", cmdName))
+  log.info_with({hub_logs=true}, string.format("userIdx: %s", userIdx))
+  log.info_with({hub_logs=true}, string.format("credIdx: %s", credIdx))
+
   local elements = ib.info_block.data.elements
   if elements.status.value == 0 then -- Success
+    -- If user is added also, update User table
+    if userIdx == nil then
+      local userType = device:get_field(lock_utils.USER_TYPE)
+      add_user_to_table(device, elements.user_index.value, userType)
+    end
+
     -- Update Credential table
-    local userIdx = elements.user_index.value
+    userIdx = elements.user_index.value
     if cmdName == "addCredential" then
       add_credential_to_table(device, userIdx, credIdx, "pin")
     end
 
     -- Update commandResult
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       userIndex = userIdx,
       credentialIndex = credIdx,
       statusCode = status
@@ -771,9 +817,6 @@ local function set_credential_response_handler(driver, device, ib, response)
     device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
     return
   end
-  
-  log.info_with({hub_logs=true}, string.format("cmdName: %s", cmdName))
-  log.info_with({hub_logs=true}, string.format("credIdx: %s", credIdx))
 
   -- @field public byte_length number 1
   -- @field public SUCCESS number 0
@@ -801,7 +844,7 @@ local function set_credential_response_handler(driver, device, ib, response)
 
   if status ~= "occupied" then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = status
     }
     local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
@@ -820,6 +863,10 @@ local function set_credential_response_handler(driver, device, ib, response)
     local credData = device:get_field(lock_utils.CRED_DATA)
     local userIdx = device:get_field(lock_utils.USER_INDEX)
     local userType = device:get_field(lock_utils.USER_TYPE)
+    local userTypeMatter = DoorLock.types.UserTypeEnum.UNRESTRICTED_USER
+    if userType == "guest" then
+      userType = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
+    end
 
     log.info_with({hub_logs=true}, string.format("credentialIndex: %s", credIdx))
     log.info_with({hub_logs=true}, string.format("credData: %s", credData))
@@ -834,11 +881,11 @@ local function set_credential_response_handler(driver, device, ib, response)
       DoorLock.server.commands.SetCredential(
         device, ep,
         DoorLock.types.DlDataOperationType.ADD, -- Data Operation Type: Add(0), Modify(2)
-        credential,  -- Credential
-        credData,    -- Credential Data
-        userIdx,     -- User Index
-        nil,         -- User Status
-        userType     -- User Type
+        credential,    -- Credential
+        credData,      -- Credential Data
+        userIdx,       -- User Index
+        nil,           -- User Status
+        userTypeMatter -- User Type
       )
     )
   end
@@ -862,7 +909,7 @@ local function handle_delete_credential(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
@@ -900,7 +947,7 @@ local function handle_delete_all_credentials(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
@@ -944,7 +991,7 @@ local function clear_credential_response_handler(driver, device, ib, response)
   
   -- Update commandResult
   local result = {
-    requestId = cmdName,
+    commandName = cmdName,
     credentialIndex = credIdx,
     statusCode = status
   }
@@ -1106,7 +1153,7 @@ local function handle_set_week_day_schedule(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockSchedules.commandResult(result, {visibility = {displayed = false}})
@@ -1178,7 +1225,7 @@ local function set_week_day_schedule_handler(driver, device, ib, response)
   
   -- Update commandResult
   local result = {
-    requestId = cmdName,
+    commandName = cmdName,
     userIndex = userIdx,
     scheduleIndex = scheduleIdx,
     statusCode = status
@@ -1203,7 +1250,7 @@ local function handle_clear_week_day_schedule(driver, device, command)
   local busy = device:get_field(lock_utils.BUSY_STATE)
   if busy == true then
     local result = {
-      requestId = cmdName,
+      commandName = cmdName,
       statusCode = "busy"
     }
     local event = capabilities.lockSchedules.commandResult(result, {visibility = {displayed = false}})
@@ -1249,7 +1296,7 @@ local function clear_week_day_schedule_handler(driver, device, ib, response)
   
   -- Update commandResult
   local result = {
-    requestId = cmdName,
+    commandName = cmdName,
     userIndex = userIdx,
     scheduleIndex = scheduleIdx,
     statusCode = status
@@ -1292,6 +1339,36 @@ local function alarm_event_handler(driver, device, ib, response)
   end
 end
 
+--------------------
+-- Lock Operation --
+--------------------
+local function lock_op_event_handler(driver, device, ib, response)
+  local fabricId = ib.data.elements.fabric_index
+  local userIdx = ib.data.elements.user_index
+  local event = ib.data.elements.lock_operation_type
+
+  if fabricId ~= nil then
+    fabricId = fabricId.value
+  end
+  if userIdx ~= nil then
+    userIdx = userIdx.value
+  end
+  if event ~= nil then
+    event = event.value
+  end
+
+  log.info_with({hub_logs=true}, string.format("fabricId: %s", fabricId))
+  log.info_with({hub_logs=true}, string.format("userIdx: %s", userIdx))
+  log.info_with({hub_logs=true}, string.format("event: %s", event))
+
+  if event > 1 then
+    return
+  end
+
+  device:emit_event(capabilities.lock.lock.data.userIndex(userIdx, {state_change = true}))
+end
+
+
 local function handle_refresh(driver, device, command)
   local req = DoorLock.attributes.LockState:read(device)
   device:send(req)
@@ -1308,7 +1385,7 @@ local matter_lock_driver = {
     attr = {
       [DoorLock.ID] = {
         [DoorLock.attributes.LockState.ID] = lock_state_handler,
-        -- [DoorLock.attributes.OperatingMode.ID] = operating_modes_handler,
+        [DoorLock.attributes.OperatingMode.ID] = operating_modes_handler,
         [DoorLock.attributes.NumberOfTotalUsersSupported.ID] = total_users_supported_handler,
         [DoorLock.attributes.NumberOfPINUsersSupported.ID] = pin_users_supported_handler,
         [DoorLock.attributes.MinPINCodeLength.ID] = min_pin_code_len_handler,
@@ -1321,9 +1398,7 @@ local matter_lock_driver = {
     event = {
       [DoorLock.ID] = {
         [DoorLock.events.DoorLockAlarm.ID] = alarm_event_handler,
-    --     [DoorLock.events.LockOperation.ID] = lock_op_event_handler,
-    --     [DoorLock.events.LockOperationError.ID] = lock_op_err_event_handler,
-    --     [DoorLock.events.LockUserChange.ID] = lock_user_change_event_handler,
+        [DoorLock.events.LockOperation.ID] = lock_op_event_handler,
       },
     },
     cmd_response = {
@@ -1341,29 +1416,30 @@ local matter_lock_driver = {
     [capabilities.lock.ID] = {
       DoorLock.attributes.LockState
     },
+    [capabilities.remoteControlStatus.ID] = {
+      DoorLock.attributes.OperatingMode
+    },
     [capabilities.lockUsers.ID] = {
-      DoorLock.attributes.NumberOfTotalUsersSupported,
+      DoorLock.attributes.NumberOfTotalUsersSupported
     },
     [capabilities.lockCredentials.ID] = {
       DoorLock.attributes.NumberOfPINUsersSupported,
       DoorLock.attributes.MaxPINCodeLength,
       DoorLock.attributes.MinPINCodeLength,
-      DoorLock.attributes.RequirePINforRemoteOperation,
+      DoorLock.attributes.RequirePINforRemoteOperation
     },
     [capabilities.lockSchedules.ID] = {
       DoorLock.attributes.NumberOfWeekDaySchedulesSupportedPerUser,
       DoorLock.attributes.NumberOfYearDaySchedulesSupportedPerUser
     },
-    -- [lockStatusID] = {
-    --   DoorLock.attributes.OperatingMode,
-    -- },
   },
   subscribed_events = {
-    -- [lockStatusID] = {
-    --   DoorLock.events.DoorLockAlarm,
-    --   DoorLock.events.LockOperation,
-    --   DoorLock.events.LockOperationError,
-    -- },
+    [DoorLock.ID] = {
+      DoorLock.events.LockOperation
+    },
+    [capabilities.lockAlarm.ID] = {
+      DoorLock.events.DoorLockAlarm
+    },
     -- [lockUsersID] = {
     --   DoorLock.events.LockUserChange,
     -- },

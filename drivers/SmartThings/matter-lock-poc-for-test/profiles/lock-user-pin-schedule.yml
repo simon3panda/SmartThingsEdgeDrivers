@@ -1,4 +1,4 @@
-name: base-lock
+name: lock-user-pin-schedule
 components:
 - id: main
   capabilities:
