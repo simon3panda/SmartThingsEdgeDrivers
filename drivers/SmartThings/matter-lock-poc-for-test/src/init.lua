@@ -668,7 +668,7 @@ local function handle_add_credential(driver, device, command)
   local userType = command.args.userType
   local userTypeMatter = DoorLock.types.UserTypeEnum.UNRESTRICTED_USER
   if userType == "guest" then
-    userType = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
+    userTypeMatter = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
   end
   local credential = {
     credential_type = DoorLock.types.CredentialTypeEnum.PIN,
@@ -865,7 +865,7 @@ local function set_credential_response_handler(driver, device, ib, response)
     local userType = device:get_field(lock_utils.USER_TYPE)
     local userTypeMatter = DoorLock.types.UserTypeEnum.UNRESTRICTED_USER
     if userType == "guest" then
-      userType = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
+      userTypeMatter = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
     end
 
     log.info_with({hub_logs=true}, string.format("credentialIndex: %s", credIdx))
