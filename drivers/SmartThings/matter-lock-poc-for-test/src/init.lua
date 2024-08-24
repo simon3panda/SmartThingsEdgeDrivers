@@ -83,14 +83,15 @@ end
 local function lock_state_handler(driver, device, ib, response)
   log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! lock_state_handler !!!!!!!!!!!!!"))
   local LockState = DoorLock.attributes.LockState
+  local Lock = capabilities.lock.lock
   if ib.data.value == LockState.NOT_FULLY_LOCKED then
-    device:emit_event(capabilities.lock.lock.not_fully_locked({state_change = true}))
+    device:emit_event(Lock.not_fully_locked({state_change = true}))
   elseif ib.data.value == LockState.LOCKED then
-    device:emit_event(capabilities.lock.lock.locked({state_change = true}))
+    device:emit_event(Lock.locked({state_change = true}))
   elseif ib.data.value == LockState.UNLOCKED then
-    device:emit_event(capabilities.lock.lock.unlocked({state_change = true}))
+    device:emit_event(Lock.unlocked({state_change = true}))
   elseif ib.data.value == LockState.UNLATCHED then
-    device:emit_event(capabilities.lock.lock.locked({state_change = true}))
+    device:emit_event(Lock.locked({state_change = true}))
   else
     device:emit_event(capabilities.lock.lock.unknown({state_change = true}))
   end
@@ -1324,6 +1325,7 @@ end
 -- Lock Alarm --
 ----------------
 local function alarm_event_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! alarm_event_handler !!!!!!!!!!!!!"))
   local DlAlarmCode = DoorLock.types.DlAlarmCode
   local alarm_code = ib.data.elements.alarm_code
   if alarm_code.value == DlAlarmCode.LOCK_JAMMED then
@@ -1343,29 +1345,70 @@ end
 -- Lock Operation --
 --------------------
 local function lock_op_event_handler(driver, device, ib, response)
-  local fabricId = ib.data.elements.fabric_index
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! lock_op_event_handler !!!!!!!!!!!!!"))
+  local opType = ib.data.elements.lock_operation_type
+  local opSource = ib.data.elements.operation_source
   local userIdx = ib.data.elements.user_index
-  local event = ib.data.elements.lock_operation_type
+  local fabricId = ib.data.elements.fabric_index
+
+  if opType == nil or opSource == nil then
+    return
+  end
+
+  local Type = DoorLock.types.LockOperationTypeEnum
+  local Lock = capabilities.lock.lock
+  if opType.value == Type.LOCK then
+    opType = Lock.locked
+  elseif opType.value == Type.UNLOCK then
+    opType = Lock.unlocked
+  elseif opType.value == Type.UNLATCH then
+    opType = Lock.locked
+  else
+    return
+  end
+
+  local Source = DoorLock.types.OperationSourceEnum
+  if opSource.value == Source.UNSPECIFIED then
+    opSource = nil
+  elseif opSource.value == Source.MANUAL then
+    opSource = "manual"
+  elseif opSource.value == Source.PROPRIETARY_REMOTE then
+    opSource = "proprietaryRemote"
+  elseif opSource.value == Source.KEYPAD then
+    opSource = "keypad"
+  elseif opSource.value == Source.AUTO then
+    opSource = "auto"
+  elseif opSource.value == Source.BUTTON then
+    opSource = "button"
+  elseif opSource.value == Source.SCHEDULE then
+    opSource = nil
+  elseif opSource.value == Source.REMOTE then
+    opSource = "command"
+  elseif opSource.value == Source.RFID then
+    opSource = "rfid"
+  elseif opSource.value == Source.BIOMETRIC then
+    opSource = "keypad"
+  elseif opSource.value == Source.ALIRO then
+    opSource = nil
+  else
+    opSource =nil
+  end
 
   if fabricId ~= nil then
     fabricId = fabricId.value
   end
+
   if userIdx ~= nil then
     userIdx = userIdx.value
   end
-  if event ~= nil then
-    event = event.value
-  end
 
-  log.info_with({hub_logs=true}, string.format("fabricId: %s", fabricId))
+  log.info_with({hub_logs=true}, string.format("opType: %s", opType.NAME))
+  log.info_with({hub_logs=true}, string.format("opSource: %s", opSource))
   log.info_with({hub_logs=true}, string.format("userIdx: %s", userIdx))
-  log.info_with({hub_logs=true}, string.format("event: %s", event))
+  log.info_with({hub_logs=true}, string.format("fabricId: %s", fabricId))
 
-  if event > 1 then
-    return
-  end
-
-  device:emit_event(capabilities.lock.lock.data.userIndex(userIdx, {state_change = true}))
+  local data_obj = {method = opSource, userIndex = userIdx}
+  device:emit_event(opType({data = data_obj}, {state_change = true}))
 end
 
 
@@ -1434,7 +1477,7 @@ local matter_lock_driver = {
     },
   },
   subscribed_events = {
-    [DoorLock.ID] = {
+    [capabilities.lock.ID] = {
       DoorLock.events.LockOperation
     },
     [capabilities.lockAlarm.ID] = {
