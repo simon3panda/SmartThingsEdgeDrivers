@@ -115,10 +115,10 @@ local function operating_modes_handler(driver, device, ib, response)
   local result = opMode_map[ib.data.value]
   if result == true then
     device:emit_event(status("true", {visibility = {displayed = true}}))
-    device:emit_event(capabilities.lock.supportedLockCommands({"lock", "unlock"}))
+    device:emit_event(capabilities.lock.supportedLockCommands({"lock", "unlock"}, {visibility = {displayed = false}}))
   elseif result == false then
     device:emit_event(status("false", {visibility = {displayed = true}}))
-    device:emit_event(capabilities.lock.supportedLockCommands({}))
+    device:emit_event(capabilities.lock.supportedLockCommands({}, {visibility = {displayed = false}}))
   end
 end
 -------------------------------------
@@ -301,7 +301,7 @@ local function add_user_to_table(device, userIdx, usrType)
 
   -- Add new entry to table
   table.insert(new_user_table, {userIndex = userIdx, userType = usrType})
-  device:emit_event(capabilities.lockUsers.users(new_user_table))
+  device:emit_event(capabilities.lockUsers.users(new_user_table, {visibility = {displayed = false}}))
 end
 
 local function update_user_in_table(device, userIdx, usrType)
@@ -327,14 +327,14 @@ local function update_user_in_table(device, userIdx, usrType)
   -- Update user entry
   if i ~= 0 then
     new_user_table[i].userType = usrType
-    device:emit_event(capabilities.lockUsers.users(new_user_table))
+    device:emit_event(capabilities.lockUsers.users(new_user_table, {visibility = {displayed = false}}))
   end
 end
 
 local function delete_user_from_table(device, userIdx)
   -- If User Index is ALL_INDEX, remove all entry from the table
   if userIdx == ALL_INDEX then
-    device:emit_event(capabilities.lockUsers.users({}))
+    device:emit_event(capabilities.lockUsers.users({}, {visibility = {displayed = false}}))
     return
   end
 
@@ -352,7 +352,7 @@ local function delete_user_from_table(device, userIdx)
       table.insert(new_user_table, entry)
     end
   end
-  device:emit_event(capabilities.lockUsers.users(new_user_table))
+  device:emit_event(capabilities.lockUsers.users(new_user_table, {visibility = {displayed = false}}))
 end
 
 --------------
@@ -662,7 +662,7 @@ local function add_credential_to_table(device, userIdx, credIdx, credType)
 
   -- Add new entry to table
   table.insert(new_cred_table, {userIndex = userIdx, credentialIndex = credIdx, credentialType = credType})
-  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table))
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
 end
 
 local function delete_credential_from_table(device, credIdx)
@@ -687,13 +687,13 @@ local function delete_credential_from_table(device, credIdx)
     end
   end
 
-  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table))
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
 end
 
 local function delete_credential_from_table_as_user(device, userIdx)
   -- If User Index is ALL_INDEX, remove all entry from the table
   if userIdx == ALL_INDEX then
-    device:emit_event(capabilities.lockCredentials.credentials({}))
+    device:emit_event(capabilities.lockCredentials.credentials({}, {visibility = {displayed = false}}))
   end
 
   -- Get latest credential table
@@ -712,7 +712,7 @@ local function delete_credential_from_table_as_user(device, userIdx)
     end
   end
 
-  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table))
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
 end
 
 --------------------
@@ -1184,7 +1184,7 @@ local function add_week_schedule_to_table(device, userIdx, scheduleIdx, schedule
     )
   end
 
-  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table))
+  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table, {visibility = {displayed = false}}))
 end
 
 local function delete_week_schedule_to_table(device, userIdx, scheduleIdx)
@@ -1229,7 +1229,7 @@ local function delete_week_schedule_to_table(device, userIdx, scheduleIdx)
     new_week_schedule_table[i].schedules = new_schedule_table
   end
 
-  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table))
+  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table, {visibility = {displayed = false}}))
 end
 
 ---------------------------
@@ -1609,10 +1609,7 @@ local matter_lock_driver = {
     },
     [capabilities.lockAlarm.ID] = {
       DoorLock.events.DoorLockAlarm
-    },
-    -- [lockUsersID] = {
-    --   DoorLock.events.LockUserChange,
-    -- },
+    }
   },
   capability_handlers = {
     [capabilities.lock.ID] = {
