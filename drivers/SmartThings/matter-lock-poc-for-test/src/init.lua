@@ -538,7 +538,7 @@ local function handle_delete_user(driver, device, command)
 
   -- Send command
   local ep = device:component_to_endpoint(command.component)
-  device:send(DoorLock.server.commands.ClearUser(device, ep, userIndex))
+  device:send(DoorLock.server.commands.ClearUser(device, ep, userIdx))
 end
 
 ----------------------
