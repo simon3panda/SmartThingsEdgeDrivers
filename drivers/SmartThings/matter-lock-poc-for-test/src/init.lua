@@ -335,6 +335,7 @@ local function delete_user_from_table(device, userIdx)
   -- If User Index is ALL_INDEX, remove all entry from the table
   if userIdx == ALL_INDEX then
     device:emit_event(capabilities.lockUsers.users({}))
+    return
   end
 
   -- Get latest user table
@@ -345,13 +346,12 @@ local function delete_user_from_table(device, userIdx)
   ) or {}
   local new_user_table = {}
 
-  -- find user entry
+  -- Recreate user table
   for index, entry in pairs(user_table) do
     if entry.userIndex ~= userIdx then
       table.insert(new_user_table, entry)
     end
   end
-
   device:emit_event(capabilities.lockUsers.users(new_user_table))
 end
 
@@ -377,7 +377,13 @@ local function handle_add_user(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockUsers.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -430,7 +436,13 @@ local function handle_update_user(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockUsers.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -501,7 +513,13 @@ local function set_user_response_handler(driver, device, ib, response)
     userIndex = userIdx,
     statusCode = status
   }
-  local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+  local event = capabilities.lockUsers.commandResult(
+    result,
+    {
+      state_change = true,
+      visibility = {displayed = false}
+    }
+  )
   device:emit_event(event)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
 end
@@ -523,7 +541,13 @@ local function handle_delete_user(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockUsers.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -557,7 +581,13 @@ local function handle_delete_all_users(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockUsers.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -589,9 +619,10 @@ local function clear_user_response_handler(driver, device, ib, response)
     status = "invalidCommand"
   end
 
-  -- Delete User in table
+  -- Delete User and Credential from table
   if status == "success" then
     delete_user_from_table(device, userIdx)
+    delete_credential_from_table_as_user(device, userIdx)
   end
 
   -- Update commandResult
@@ -600,7 +631,12 @@ local function clear_user_response_handler(driver, device, ib, response)
     userIndex = userIdx,
     statusCode = status
   }
-  local event = capabilities.lockUsers.commandResult(result, {visibility = {displayed = false}})
+  local event = capabilities.lockUsers.commandResult(
+    result,
+    {
+
+      visibility = {displayed = false}
+    })
   device:emit_event(event)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
 end
@@ -654,6 +690,31 @@ local function delete_credential_from_table(device, credIdx)
   device:emit_event(capabilities.lockCredentials.credentials(new_cred_table))
 end
 
+local function delete_credential_from_table_as_user(device, userIdx)
+  -- If User Index is ALL_INDEX, remove all entry from the table
+  if userIdx == ALL_INDEX then
+    device:emit_event(capabilities.lockCredentials.credentials({}))
+  end
+
+  -- Get latest credential table
+  local cred_table = device:get_latest_state(
+    "main",
+    capabilities.lockCredentials.ID,
+    capabilities.lockCredentials.credentials.NAME
+  ) or {}
+  local new_cred_table = {}
+
+  -- Recreate credential table
+  local i = 0
+  for index, entry in pairs(cred_table) do
+    if entry.userIndex ~= userIdx then
+      table.insert(new_cred_table, entry)
+    end
+  end
+
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table))
+end
+
 --------------------
 -- Add Credential --
 --------------------
@@ -684,7 +745,13 @@ local function handle_add_credential(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockCredentials.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -741,7 +808,13 @@ local function handle_update_credential(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockCredentials.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -813,7 +886,13 @@ local function set_credential_response_handler(driver, device, ib, response)
       credentialIndex = credIdx,
       statusCode = status
     }
-    local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockCredentials.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
     return
@@ -848,7 +927,13 @@ local function set_credential_response_handler(driver, device, ib, response)
       commandName = cmdName,
       statusCode = status
     }
-    local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockCredentials.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
     return
@@ -913,7 +998,13 @@ local function handle_delete_credential(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockCredentials.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -951,7 +1042,13 @@ local function handle_delete_all_credentials(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockCredentials.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -996,7 +1093,13 @@ local function clear_credential_response_handler(driver, device, ib, response)
     credentialIndex = credIdx,
     statusCode = status
   }
-  local event = capabilities.lockCredentials.commandResult(result, {visibility = {displayed = false}})
+  local event = capabilities.lockCredentials.commandResult(
+    result,
+    {
+      state_change = true,
+      visibility = {displayed = false}
+    }
+  )
   device:emit_event(event)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
 end
@@ -1157,7 +1260,13 @@ local function handle_set_week_day_schedule(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockSchedules.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockSchedules.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -1231,7 +1340,13 @@ local function set_week_day_schedule_handler(driver, device, ib, response)
     scheduleIndex = scheduleIdx,
     statusCode = status
   }
-  local event = capabilities.lockSchedules.commandResult(result, {visibility = {displayed = false}})
+  local event = capabilities.lockSchedules.commandResult(
+    result,
+    {
+      state_change = true,
+      visibility = {displayed = false}
+    }
+  )
   device:emit_event(event)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
 end
@@ -1254,7 +1369,13 @@ local function handle_clear_week_day_schedule(driver, device, command)
       commandName = cmdName,
       statusCode = "busy"
     }
-    local event = capabilities.lockSchedules.commandResult(result, {visibility = {displayed = false}})
+    local event = capabilities.lockSchedules.commandResult(
+      result,
+      {
+        state_change = true,
+        visibility = {displayed = false}
+      }
+    )
     device:emit_event(event)
     return
   end
@@ -1302,7 +1423,13 @@ local function clear_week_day_schedule_handler(driver, device, ib, response)
     scheduleIndex = scheduleIdx,
     statusCode = status
   }
-  local event = capabilities.lockSchedules.commandResult(result, {visibility = {displayed = false}})
+  local event = capabilities.lockSchedules.commandResult(
+    result,
+    {
+      state_change = true,
+      visibility = {displayed = false}
+    }
+  )
   device:emit_event(event)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
 end
