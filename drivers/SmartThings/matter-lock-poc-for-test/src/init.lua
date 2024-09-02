@@ -1535,7 +1535,7 @@ local function lock_op_event_handler(driver, device, ib, response)
   log.info_with({hub_logs=true}, string.format("fabricId: %s", fabricId))
 
   local data_obj = {method = opSource, userIndex = userIdx}
-  device:emit_event(opType({data = data_obj}, {state_change = true}))
+  device:emit_event(opType({data = data_obj, state_change = true}))
 end
 
 ----------------------
