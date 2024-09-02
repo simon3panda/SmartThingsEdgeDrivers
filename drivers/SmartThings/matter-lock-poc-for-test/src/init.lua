@@ -85,15 +85,15 @@ local function lock_state_handler(driver, device, ib, response)
   local LockState = DoorLock.attributes.LockState
   local Lock = capabilities.lock.lock
   if ib.data.value == LockState.NOT_FULLY_LOCKED then
-    device:emit_event(Lock.not_fully_locked({state_change = true}))
+    device:emit_event(Lock.not_fully_locked())
   elseif ib.data.value == LockState.LOCKED then
-    device:emit_event(Lock.locked({state_change = true}))
+    device:emit_event(Lock.locked())
   elseif ib.data.value == LockState.UNLOCKED then
-    device:emit_event(Lock.unlocked({state_change = true}))
+    device:emit_event(Lock.unlocked())
   elseif ib.data.value == LockState.UNLATCHED then
-    device:emit_event(Lock.locked({state_change = true}))
+    device:emit_event(Lock.locked())
   else
-    device:emit_event(capabilities.lock.lock.unknown({state_change = true}))
+    device:emit_event(capabilities.lock.lock.unknown())
   end
 end
 
@@ -353,6 +353,208 @@ local function delete_user_from_table(device, userIdx)
     end
   end
   device:emit_event(capabilities.lockUsers.users(new_user_table, {visibility = {displayed = false}}))
+end
+
+----------------------
+-- Credential Table --
+----------------------
+local function add_credential_to_table(device, userIdx, credIdx, credType)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_credential_to_table !!!!!!!!!!!!!"))
+
+  -- Get latest credential table
+  local cred_table = device:get_latest_state(
+    "main",
+    capabilities.lockCredentials.ID,
+    capabilities.lockCredentials.credentials.NAME
+  ) or {}
+  local new_cred_table = {}
+
+  -- Recreat credential table
+  for index, entry in pairs(cred_table) do
+    table.insert(new_cred_table, entry)
+  end
+
+  -- Add new entry to table
+  table.insert(new_cred_table, {userIndex = userIdx, credentialIndex = credIdx, credentialType = credType})
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
+end
+
+local function delete_credential_from_table(device, credIdx)
+  -- If Credential Index is ALL_INDEX, remove all entry from the table
+  if credIdx == ALL_INDEX then
+    device:emit_event(capabilities.lockCredentials.credentials({}))
+  end
+
+  -- Get latest credential table
+  local cred_table = device:get_latest_state(
+    "main",
+    capabilities.lockCredentials.ID,
+    capabilities.lockCredentials.credentials.NAME
+  ) or {}
+  local new_cred_table = {}
+
+  -- Recreate credential table
+  local i = 0
+  for index, entry in pairs(cred_table) do
+    if entry.credentialIndex ~= credIdx then
+      table.insert(new_cred_table, entry)
+    end
+  end
+
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
+end
+
+local function delete_credential_from_table_as_user(device, userIdx)
+  -- If User Index is ALL_INDEX, remove all entry from the table
+  if userIdx == ALL_INDEX then
+    device:emit_event(capabilities.lockCredentials.credentials({}, {visibility = {displayed = false}}))
+  end
+
+  -- Get latest credential table
+  local cred_table = device:get_latest_state(
+    "main",
+    capabilities.lockCredentials.ID,
+    capabilities.lockCredentials.credentials.NAME
+  ) or {}
+  local new_cred_table = {}
+
+  -- Recreate credential table
+  local i = 0
+  for index, entry in pairs(cred_table) do
+    if entry.userIndex ~= userIdx then
+      table.insert(new_cred_table, entry)
+    end
+  end
+
+  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
+end
+
+-----------------------------
+-- Week Day Schedule Table --
+-----------------------------
+local WEEK_DAY_MAP = {
+  ["Sunday"] = 1,
+  ["Monday"] = 2,
+  ["Tuesday"] = 4,
+  ["Wednesday"] = 8,
+  ["Thursday"] = 16,
+  ["Friday"] = 32,
+  ["Saturday"] = 64,
+}
+
+local function add_week_schedule_to_table(device, userIdx, scheduleIdx, schedule)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_week_schedule_to_table !!!!!!!!!!!!!"))
+
+  -- Get latest week day schedule table
+  local week_schedule_table = device:get_latest_state(
+    "main",
+    capabilities.lockSchedules.ID,
+    capabilities.lockSchedules.weekDaySchedules.NAME
+  ) or {}
+  local new_week_schedule_table = {}
+
+  -- Find shcedule list
+  local i = 0
+  for index, entry in pairs(week_schedule_table) do
+    if entry.userIndex == userIdx then
+      i = index
+    end
+    table.insert(new_week_schedule_table, entry)
+  end
+
+  -- Recreate weekDays list
+  local weekDayList = {}
+  for _, weekday in ipairs(schedule.weekDays) do
+    table.insert(weekDayList, weekday)
+    log.info_with({hub_logs=true}, string.format("weekDay: %s", weekday))
+  end
+
+  if i ~= 0 then -- Add schedule for existing user
+    local new_schedule_table = {}
+    for index, entry in pairs(new_week_schedule_table[i].schedules) do
+      if entry.scheduleIndex == scheduleIdx then
+        return
+      end
+      table.insert(new_schedule_table, entry)
+    end
+
+    table.insert(
+      new_schedule_table,
+      {
+        scheduleIndex = scheduleIdx,
+        weekdays = weekDayList,
+        startHour = schedule.startHour,
+        startMinute = schedule.startMinute,
+        endHour = schedule.endHour,
+        endMinute = schedule.endMinute
+      }
+    )
+
+    new_week_schedule_table[i].schedules = new_schedule_table
+  else -- Add schedule for new user
+    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_week_schedule_to_table 2!!!!!!!!!!!!!"))
+    table.insert(
+      new_week_schedule_table,
+      {
+        userIndex = userIdx,
+        schedules = {{
+          scheduleIndex = scheduleIdx,
+          weekdays = weekDayList,
+          startHour = schedule.startHour,
+          startMinute = schedule.startMinute,
+          endHour = schedule.endHour,
+          endMinute = schedule.endMinute
+        }}
+      }
+    )
+  end
+
+  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table, {visibility = {displayed = false}}))
+end
+
+local function delete_week_schedule_to_table(device, userIdx, scheduleIdx)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! delete_week_schedule_to_table !!!!!!!!!!!!!"))
+
+  -- Get latest week day schedule table
+  local week_schedule_table = device:get_latest_state(
+    "main",
+    capabilities.lockSchedules.ID,
+    capabilities.lockSchedules.weekDaySchedules.NAME
+  ) or {}
+  local new_week_schedule_table = {}
+
+  -- Find shcedule list
+  local i = 0
+  for index, entry in pairs(week_schedule_table) do
+    if entry.userIndex == userIdx then
+      i = index
+    end
+    table.insert(new_week_schedule_table, entry)
+  end
+
+  -- When there is no userIndex in the table
+  if i == 0 then
+    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! No userIndex in Week Day Schedule Table !!!!!!!!!!!!!", i))
+    return
+  end
+
+  -- Recreate schedule table for the user
+  local new_schedule_table = {}
+  for index, entry in pairs(new_week_schedule_table[i].schedules) do
+    if entry.scheduleIndex ~= scheduleIdx then
+      table.insert(new_schedule_table, entry)
+    end
+  end
+
+  -- If user has no schedule, remove user from the table
+  if #new_schedule_table == 0 then
+    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! No schedule for User !!!!!!!!!!!!!", i))
+    table.remove(new_week_schedule_table, i)
+  else
+    new_week_schedule_table[i].schedules = new_schedule_table
+  end
+
+  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table, {visibility = {displayed = false}}))
 end
 
 --------------
@@ -639,80 +841,6 @@ local function clear_user_response_handler(driver, device, ib, response)
     })
   device:emit_event(event)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
-end
-
-----------------------
--- Credential Table --
-----------------------
-local function add_credential_to_table(device, userIdx, credIdx, credType)
-  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_credential_to_table !!!!!!!!!!!!!"))
-
-  -- Get latest credential table
-  local cred_table = device:get_latest_state(
-    "main",
-    capabilities.lockCredentials.ID,
-    capabilities.lockCredentials.credentials.NAME
-  ) or {}
-  local new_cred_table = {}
-
-  -- Recreat credential table
-  for index, entry in pairs(cred_table) do
-    table.insert(new_cred_table, entry)
-  end
-
-  -- Add new entry to table
-  table.insert(new_cred_table, {userIndex = userIdx, credentialIndex = credIdx, credentialType = credType})
-  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
-end
-
-local function delete_credential_from_table(device, credIdx)
-  -- If Credential Index is ALL_INDEX, remove all entry from the table
-  if credIdx == ALL_INDEX then
-    device:emit_event(capabilities.lockCredentials.credentials({}))
-  end
-
-  -- Get latest credential table
-  local cred_table = device:get_latest_state(
-    "main",
-    capabilities.lockCredentials.ID,
-    capabilities.lockCredentials.credentials.NAME
-  ) or {}
-  local new_cred_table = {}
-
-  -- Recreate credential table
-  local i = 0
-  for index, entry in pairs(cred_table) do
-    if entry.credentialIndex ~= credIdx then
-      table.insert(new_cred_table, entry)
-    end
-  end
-
-  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
-end
-
-local function delete_credential_from_table_as_user(device, userIdx)
-  -- If User Index is ALL_INDEX, remove all entry from the table
-  if userIdx == ALL_INDEX then
-    device:emit_event(capabilities.lockCredentials.credentials({}, {visibility = {displayed = false}}))
-  end
-
-  -- Get latest credential table
-  local cred_table = device:get_latest_state(
-    "main",
-    capabilities.lockCredentials.ID,
-    capabilities.lockCredentials.credentials.NAME
-  ) or {}
-  local new_cred_table = {}
-
-  -- Recreate credential table
-  local i = 0
-  for index, entry in pairs(cred_table) do
-    if entry.userIndex ~= userIdx then
-      table.insert(new_cred_table, entry)
-    end
-  end
-
-  device:emit_event(capabilities.lockCredentials.credentials(new_cred_table, {visibility = {displayed = false}}))
 end
 
 --------------------
@@ -1104,134 +1232,6 @@ local function clear_credential_response_handler(driver, device, ib, response)
   device:set_field(lock_utils.BUSY_STATE, false, {persist = true})
 end
 
------------------------------
--- Week Day Schedule Table --
------------------------------
-local WEEK_DAY_MAP = {
-  ["Sunday"] = 1,
-  ["Monday"] = 2,
-  ["Tuesday"] = 4,
-  ["Wednesday"] = 8,
-  ["Thursday"] = 16,
-  ["Friday"] = 32,
-  ["Saturday"] = 64,
-}
-
-local function add_week_schedule_to_table(device, userIdx, scheduleIdx, schedule)
-  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_week_schedule_to_table !!!!!!!!!!!!!"))
-  
-  -- Get latest week day schedule table
-  local week_schedule_table = device:get_latest_state(
-    "main",
-    capabilities.lockSchedules.ID,
-    capabilities.lockSchedules.weekDaySchedules.NAME
-  ) or {}
-  local new_week_schedule_table = {}
-
-  -- Find shcedule list 
-  local i = 0
-  for index, entry in pairs(week_schedule_table) do
-    if entry.userIndex == userIdx then
-      i = index
-    end
-    table.insert(new_week_schedule_table, entry)
-  end
-  
-  -- Recreate weekDays list
-  local weekDayList = {}
-  for _, weekday in ipairs(schedule.weekDays) do
-    table.insert(weekDayList, weekday)
-    log.info_with({hub_logs=true}, string.format("weekDay: %s", weekday))
-  end
-
-  if i ~= 0 then -- Add schedule for existing user
-    local new_schedule_table = {}
-    for index, entry in pairs(new_week_schedule_table[i].schedules) do
-      if entry.scheduleIndex == scheduleIdx then
-        return
-      end
-      table.insert(new_schedule_table, entry)
-    end
-
-    table.insert(
-      new_schedule_table,
-      {
-        scheduleIndex = scheduleIdx,
-        weekdays = weekDayList,
-        startHour = schedule.startHour,
-        startMinute = schedule.startMinute,
-        endHour = schedule.endHour,
-        endMinute = schedule.endMinute
-      }
-    )
-
-    new_week_schedule_table[i].schedules = new_schedule_table
-  else -- Add schedule for new user
-    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! add_week_schedule_to_table 2!!!!!!!!!!!!!"))
-    table.insert(
-      new_week_schedule_table,
-      {
-        userIndex = userIdx,
-        schedules = {{
-          scheduleIndex = scheduleIdx,
-          weekdays = weekDayList,
-          startHour = schedule.startHour,
-          startMinute = schedule.startMinute,
-          endHour = schedule.endHour,
-          endMinute = schedule.endMinute
-        }}
-      }
-    )
-  end
-
-  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table, {visibility = {displayed = false}}))
-end
-
-local function delete_week_schedule_to_table(device, userIdx, scheduleIdx)
-  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! delete_week_schedule_to_table !!!!!!!!!!!!!"))
-
-  -- Get latest week day schedule table
-  local week_schedule_table = device:get_latest_state(
-    "main",
-    capabilities.lockSchedules.ID,
-    capabilities.lockSchedules.weekDaySchedules.NAME
-  ) or {}
-  local new_week_schedule_table = {}
-
-  -- Find shcedule list 
-  local i = 0
-  for index, entry in pairs(week_schedule_table) do
-    if entry.userIndex == userIdx then
-      i = index
-    end
-    table.insert(new_week_schedule_table, entry)
-  end
-
-  -- When there is no userIndex in the table
-  if i == 0 then
-    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! No userIndex in Week Day Schedule Table !!!!!!!!!!!!!", i))  
-    return
-  end
-  
-  -- Recreate schedule table for the user
-  local new_schedule_table = {}
-  for index, entry in pairs(new_week_schedule_table[i].schedules) do
-    if entry.scheduleIndex ~= scheduleIdx then
-      table.insert(new_schedule_table, entry)
-    end
-  end
-
-  -- If user has no schedule, remove user from the table
-  if #new_schedule_table == 0 then
-    log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! No schedule for User !!!!!!!!!!!!!", i))
-    table.remove(new_week_schedule_table, i)
-  else
-    new_week_schedule_table[i].schedules = new_schedule_table
-  end
-
-  device:emit_event(capabilities.lockSchedules.weekDaySchedules(new_week_schedule_table, {visibility = {displayed = false}}))
-end
-
 ---------------------------
 -- Set Week Day Schedule --
 ---------------------------
@@ -1538,6 +1538,69 @@ local function lock_op_event_handler(driver, device, ib, response)
   device:emit_event(opType({data = data_obj}, {state_change = true}))
 end
 
+----------------------
+-- Lock User Change --
+----------------------
+local function lock_user_change_event_handler(driver, device, ib, response)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! lock_user_change_event_handler !!!!!!!!!!!!!"))
+  local lockDataType = ib.data.elements.lock_data_type
+  local dataOpType = ib.data.elements.data_operation_type
+  local opSource = ib.data.elements.operation_source
+  local userIdx = ib.data.elements.user_index
+  local fabricId = ib.data.elements.fabric_index
+
+  if lockDataType ~= nil then
+    lockDataType = lockDataType.value
+  end
+
+  if dataOpType ~= nil then
+    dataOpType = dataOpType.value
+  end
+
+  local Source = DoorLock.types.OperationSourceEnum
+  if opSource.value == Source.UNSPECIFIED then
+    opSource = nil
+  elseif opSource.value == Source.MANUAL then
+    opSource = "manual"
+  elseif opSource.value == Source.PROPRIETARY_REMOTE then
+    opSource = "proprietaryRemote"
+  elseif opSource.value == Source.KEYPAD then
+    opSource = "keypad"
+  elseif opSource.value == Source.AUTO then
+    opSource = "auto"
+  elseif opSource.value == Source.BUTTON then
+    opSource = "button"
+  elseif opSource.value == Source.SCHEDULE then
+    opSource = nil
+  elseif opSource.value == Source.REMOTE then
+    opSource = "command"
+  elseif opSource.value == Source.RFID then
+    opSource = "rfid"
+  elseif opSource.value == Source.BIOMETRIC then
+    opSource = "keypad"
+  elseif opSource.value == Source.ALIRO then
+    opSource = nil
+  else
+    opSource =nil
+  end
+
+  if userIdx ~= nil then
+    userIdx = userIdx.value
+  end
+
+  if fabricId ~= nil then
+    fabricId = fabricId.value
+  end
+
+  log.info_with({hub_logs=true}, string.format("lockDataType: %s", lockDataType))
+  log.info_with({hub_logs=true}, string.format("dataOpType: %s", dataOpType))
+  log.info_with({hub_logs=true}, string.format("opSource: %s", opSource))
+  log.info_with({hub_logs=true}, string.format("userIdx: %s", userIdx))
+  log.info_with({hub_logs=true}, string.format("fabricId: %s", fabricId))
+
+  -- local data_obj = {method = opSource, userIndex = userIdx}
+  -- device:emit_event(opType({data = data_obj}, {state_change = true}))
+end
 
 local function handle_refresh(driver, device, command)
   local req = DoorLock.attributes.LockState:read(device)
@@ -1569,6 +1632,7 @@ local matter_lock_driver = {
       [DoorLock.ID] = {
         [DoorLock.events.DoorLockAlarm.ID] = alarm_event_handler,
         [DoorLock.events.LockOperation.ID] = lock_op_event_handler,
+        [DoorLock.events.LockUserChange.ID] = lock_user_change_event_handler,
       },
     },
     cmd_response = {
@@ -1609,6 +1673,9 @@ local matter_lock_driver = {
     },
     [capabilities.lockAlarm.ID] = {
       DoorLock.events.DoorLockAlarm
+    },
+    [capabilities.lockUser.ID] = {
+      DoorLock.events.LockUserChange
     }
   },
   capability_handlers = {
