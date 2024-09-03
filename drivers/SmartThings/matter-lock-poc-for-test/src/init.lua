@@ -87,11 +87,11 @@ local function lock_state_handler(driver, device, ib, response)
   if ib.data.value == LockState.NOT_FULLY_LOCKED then
     device:emit_event(Lock.not_fully_locked())
   elseif ib.data.value == LockState.LOCKED then
-    device:emit_event(Lock.locked())
+    device:emit_event(Lock.locked({visibility = {displayed = false}}))
   elseif ib.data.value == LockState.UNLOCKED then
-    device:emit_event(Lock.unlocked())
+    device:emit_event(Lock.unlocked({visibility = {displayed = false}}))
   elseif ib.data.value == LockState.UNLATCHED then
-    device:emit_event(Lock.locked())
+    device:emit_event(Lock.locked({visibility = {displayed = false}}))
   else
     device:emit_event(capabilities.lock.lock.unknown())
   end
@@ -332,6 +332,7 @@ local function update_user_in_table(device, userIdx, usrType)
 end
 
 local function delete_user_from_table(device, userIdx)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! delete_user_from_table !!!!!!!!!!!!!"))
   -- If User Index is ALL_INDEX, remove all entry from the table
   if userIdx == ALL_INDEX then
     device:emit_event(capabilities.lockUsers.users({}, {visibility = {displayed = false}}))
@@ -380,6 +381,7 @@ local function add_credential_to_table(device, userIdx, credIdx, credType)
 end
 
 local function delete_credential_from_table(device, credIdx)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! delete_credential_from_table !!!!!!!!!!!!!"))
   -- If Credential Index is ALL_INDEX, remove all entry from the table
   if credIdx == ALL_INDEX then
     device:emit_event(capabilities.lockCredentials.credentials({}))
@@ -405,6 +407,7 @@ local function delete_credential_from_table(device, credIdx)
 end
 
 local function delete_credential_from_table_as_user(device, userIdx)
+  log.info_with({hub_logs=true}, string.format("!!!!!!!!!!!!!!! delete_credential_from_table_as_user !!!!!!!!!!!!!"))
   -- If User Index is ALL_INDEX, remove all entry from the table
   if userIdx == ALL_INDEX then
     device:emit_event(capabilities.lockCredentials.credentials({}, {visibility = {displayed = false}}))
@@ -1524,7 +1527,7 @@ local function lock_op_event_handler(driver, device, ib, response)
   if fabricId ~= nil then
     fabricId = fabricId.value
   end
-
+ 
   if userIdx ~= nil then
     userIdx = userIdx.value
   end
