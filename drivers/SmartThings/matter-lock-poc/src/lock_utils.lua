@@ -14,6 +14,15 @@
 
 local lock_utils = {
   -- Lock device field names
+  BUSY_STATE = "busyState",
+  COMMAND_NAME = "commandName",
+  USER_INDEX = "userIndex",
+  USER_TYPE = "userType",
+  CRED_INDEX = "credentialIndex",
+  CRED_DATA = "credentialData",
+  SCHEDULE_INDEX = "scheduleIndex",
+  SCHEDULE = "schedule",
+  --
   LOCK_CODES = "lockCodes",
   CHECKING_CREDENTIAL = "checkingCredential",
   CODE_STATE = "codeState",
@@ -28,13 +37,13 @@ local lock_utils = {
   DATA_OP_TYPE = "opType",
   USER_NAME = "userName",
   UNIQUE_ID = "uniqueID",
-  USER_TYPE = "userType",
+  -- USER_TYPE = "userType",
   CRED_DATA_OP_TYPE = "credOpType",
   CRED_USER_TYPE = "credUserType",
   CRED_TYPE = "credType",
   CRED_TYPE_FOR_GET = "credTypeForGet",
   CRED_USER_INDEX = "credUserIndex",
-  CRED_INDEX = "credIndex"
+  -- CRED_INDEX = "credIndex"
 }
 local capabilities = require "st.capabilities"
 local json = require "st.json"
