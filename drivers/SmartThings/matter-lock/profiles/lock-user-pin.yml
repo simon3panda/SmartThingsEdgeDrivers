@@ -1,4 +1,4 @@
-name: lock-user-schedule
+name: lock-user-pin
 components:
 - id: main
   capabilities:
@@ -10,14 +10,14 @@ components:
         enabledValues:
         - locked
         - unlocked
-        - unknown
+        - not fully locked
   - id: lockAlarm
     version: 1
   - id: remoteControlStatus
     version: 1
   - id: lockUsers
     version: 1
-  - id: lockSchedules
+  - id: lockCredentials
     version: 1
   - id: refresh
     version: 1
