@@ -19,12 +19,14 @@ local im = require "st.matter.interaction_model"
 local lock_utils = require "lock_utils"
 local log = require "log" -- needs to remove
 
+local version = require "version"
+if version.api < 10 then
+  clusters.DoorLock = require "DoorLock"
+end
+
 local DoorLock = clusters.DoorLock
 local INITIAL_COTA_INDEX = 1
 local ALL_INDEX = 0xFFFE
-
-local AQARA_MANUFACTURER_ID = 0x115f
-local U200_PRODUCT_ID = 0x2802
 
 local NEW_MATTER_LOCK_PRODUCTS = {
   {0x115f, 0x2802}, -- AQARA, U200
@@ -202,6 +204,7 @@ local function operating_modes_handler(driver, device, ib, response)
     device:emit_event(capabilities.lock.supportedLockCommands({}, {visibility = {displayed = false}}))
   end
 end
+
 -------------------------------------
 -- Number Of Total Users Supported --
 -------------------------------------
@@ -261,7 +264,7 @@ local function set_cota_credential(device, credential_index)
   end
 
   device:set_field(lock_utils.COTA_CRED_INDEX, credential_index, {persist = true})
-  local credential = {credential_type = DoorLock.types.DlCredentialType.PIN, credential_index = credential_index}
+  local credential = {credential_type = DoorLock.types.CredentialTypeEnum.PIN, credential_index = credential_index}
   -- Set the credential to a code
   device:set_field(lock_utils.BUSY_STATE, true, {persist = true})
   device:set_field(lock_utils.COMMAND_NAME, "addCota")
@@ -272,12 +275,12 @@ local function set_cota_credential(device, credential_index)
   device:send(DoorLock.server.commands.SetCredential(
     device,
     #eps > 0 and eps[1] or 1,
-    DoorLock.types.DlDataOperationType.ADD,
+    DoorLock.types.DataOperationTypeEnum.ADD,
     credential,
     device:get_field(lock_utils.COTA_CRED),
     nil, -- nil user_index creates a new user
-    DoorLock.types.DlUserStatus.OCCUPIED_ENABLED,
-    DoorLock.types.DlUserType.REMOTE_ONLY_USER
+    DoorLock.types.UserStatusEnum.OCCUPIED_ENABLED,
+    DoorLock.types.UserTypeEnum.REMOTE_ONLY_USER
   ))
 end
 
@@ -480,7 +483,6 @@ local function delete_credential_from_table(device, credIdx)
 
   -- Recreate credential table
   local userIdx = 0
-  local i = 0
   for index, entry in pairs(cred_table) do
     if entry.credentialIndex ~= credIdx then
       table.insert(new_cred_table, entry)
@@ -696,7 +698,7 @@ local function handle_add_user(driver, device, command)
   device:send(
     DoorLock.server.commands.SetUser(
       device, ep,
-      DoorLock.types.DlDataOperationType.ADD, -- Operation Type: Add(0), Modify(2)
+      DoorLock.types.DataOperationTypeEnum.ADD, -- Operation Type: Add(0), Modify(2)
       userName,         -- User Name
       nil,              -- Unique ID
       nil,              -- User Status
@@ -757,7 +759,7 @@ local function handle_update_user(driver, device, command)
   device:send(
     DoorLock.server.commands.SetUser(
       device, ep,
-      DoorLock.types.DlDataOperationType.MODIFY, -- Operation Type: Add(0), Modify(2)
+      DoorLock.types.DataOperationTypeEnum.MODIFY, -- Operation Type: Add(0), Modify(2)
       userIdx,        -- User Index
       userName,       -- User Name
       nil,            -- Unique ID
@@ -896,6 +898,7 @@ local function handle_delete_all_users(driver, device, command)
   log.info_with({hub_logs=true}, string.format("commandName: %s", cmdName)) -- needs to remove
 
   -- Send command
+  local ep = device:component_to_endpoint(command.component)
   device:send(DoorLock.server.commands.ClearUser(device, ep, ALL_INDEX))
 end
 
@@ -998,7 +1001,7 @@ local function handle_add_credential(driver, device, command)
   device:send(
     DoorLock.server.commands.SetCredential(
       device, ep,
-      DoorLock.types.DlDataOperationType.ADD, -- Data Operation Type: Add(0), Modify(2)
+      DoorLock.types.DataOperationTypeEnum.ADD, -- Data Operation Type: Add(0), Modify(2)
       credential,     -- Credential
       credData,       -- Credential Data
       userIdx,        -- User Index
@@ -1059,7 +1062,7 @@ local function handle_update_credential(driver, device, command)
   device:send(
     DoorLock.server.commands.SetCredential(
       device, ep,
-      DoorLock.types.DlDataOperationType.MODIFY, -- Data Operation Type: Add(0), Modify(2)
+      DoorLock.types.DataOperationTypeEnum.MODIFY, -- Data Operation Type: Add(0), Modify(2)
       credential,  -- Credential
       credData,    -- Credential Data
       userIdx,     -- User Index
@@ -1100,6 +1103,9 @@ local function set_credential_response_handler(driver, device, ib, response)
     -- If user is added also, update User table
     if userIdx == nil then
       local userType = device:get_field(lock_utils.USER_TYPE)
+      if userType == "remote" then
+        userType = "adminMember"
+      end
       add_user_to_table(device, elements.user_index.value, userType)
     end
 
@@ -1179,7 +1185,7 @@ local function set_credential_response_handler(driver, device, ib, response)
     -- Get parameters
     local credIdx = elements.next_credential_index.value
     local credential = {
-      credential_type = DoorLock.types.DlCredentialType.PIN,
+      credential_type = DoorLock.types.CredentialTypeEnum.PIN,
       credential_index = credIdx,
     }
     local userIdx = device:get_field(lock_utils.USER_INDEX)
@@ -1188,7 +1194,7 @@ local function set_credential_response_handler(driver, device, ib, response)
     if userType == "guest" then
       userTypeMatter = DoorLock.types.UserTypeEnum.SCHEDULE_RESTRICTED_USER
     elseif userType == "remote" then
-      userTypeMatter = DoorLock.types.DlUserType.REMOTE_ONLY_USER
+      userTypeMatter = DoorLock.types.UserTypeEnum.REMOTE_ONLY_USER
     end
 
     -- needs to remove logs
@@ -1204,7 +1210,7 @@ local function set_credential_response_handler(driver, device, ib, response)
     device:send(
       DoorLock.server.commands.SetCredential(
         device, ep,
-        DoorLock.types.DlDataOperationType.ADD, -- Data Operation Type: Add(0), Modify(2)
+        DoorLock.types.DataOperationTypeEnum.ADD, -- Data Operation Type: Add(0), Modify(2)
         credential,    -- Credential
         credData,      -- Credential Data
         userIdx,       -- User Index
@@ -1239,7 +1245,7 @@ local function handle_delete_credential(driver, device, command)
   local cmdName = "deleteCredential"
   local credIdx = command.args.credentialIndex
   local credential = {
-    credential_type = DoorLock.types.DlCredentialType.PIN,
+    credential_type = DoorLock.types.CredentialTypeEnum.PIN,
     credential_index = credIdx,
   }
 
@@ -1284,7 +1290,7 @@ local function handle_delete_all_credentials(driver, device, command)
   -- Get parameters
   local cmdName = "deleteAllCredentials"
   local credential = {
-    credential_type = DoorLock.types.DlCredentialType.PIN,
+    credential_type = DoorLock.types.CredentialTypeEnum.PIN,
     credential_index = ALL_INDEX,
   }
 
