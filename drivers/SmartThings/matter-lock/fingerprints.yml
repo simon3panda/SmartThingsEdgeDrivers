@@ -10,6 +10,17 @@ matterManufacturer:
     vendorId: 0x115F
     productId: 0x2801
     deviceProfileName: lock-user-pin
+#eufy
+  - id: "Smart Lock E30"
+    deviceLabel: Smart Lock E30
+    vendorId: 0x1533
+    productId: 0x0002
+    deviceProfileName: lock-user-pin
+  - id: "Smart Lock C34"
+    deviceLabel: Smart Lock C34
+    vendorId: 0x1533
+    productId: 0x0003
+    deviceProfileName: lock-user-pin
 #Level
   - id: "4767/1"
     deviceLabel: Level Lock Plus (Matter)
