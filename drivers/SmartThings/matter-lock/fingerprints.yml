@@ -11,6 +11,11 @@ matterManufacturer:
     productId: 0x2801
     deviceProfileName: lock-user-pin
 #eufy
+  - id: "Smart Lock E31"
+    deviceLabel: Smart Lock E31
+    vendorId: 0x1533
+    productId: 0x0001
+    deviceProfileName: lock-user-pin
   - id: "Smart Lock E30"
     deviceLabel: Smart Lock E30
     vendorId: 0x1533
