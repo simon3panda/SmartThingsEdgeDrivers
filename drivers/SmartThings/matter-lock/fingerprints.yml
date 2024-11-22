@@ -38,6 +38,12 @@ matterManufacturer:
     vendorId: 0x1531
     productId: 0x0010
     deviceProfileName: lock-user-pin
+# U-tec
+  - id: "U-tec"
+    deviceLabel: U-tec
+    vendorId: 0x147F
+    productId: 0x0001
+    deviceProfileName: lock-user-pin
 #Level
   - id: "4767/1"
     deviceLabel: Level Lock Plus (Matter)
