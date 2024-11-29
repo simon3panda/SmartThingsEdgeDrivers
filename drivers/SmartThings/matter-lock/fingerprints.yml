@@ -15,23 +15,23 @@ matterManufacturer:
     deviceLabel: Smart Lock E31
     vendorId: 0x1533
     productId: 0x0001
-    deviceProfileName: lock-user-pin
+    deviceProfileName: lock-user-pin-battery
   - id: "Smart Lock E30"
     deviceLabel: Smart Lock E30
     vendorId: 0x1533
     productId: 0x0002
-    deviceProfileName: lock-user-pin
+    deviceProfileName: lock-user-pin-battery
   - id: "Smart Lock C34"
     deviceLabel: Smart Lock C34
     vendorId: 0x1533
     productId: 0x0003
-    deviceProfileName: lock-user-pin
+    deviceProfileName: lock-user-pin-battery
 # Kwikset
   - id: "Kwikset"
     deviceLabel: Kwikset
     vendorId: 0x1421
     productId: 0x0041
-    deviceProfileName: lock-user-pin
+    deviceProfileName: lock-user-pin-battery
 # Solity
   - id: "Solity"
     deviceLabel: Solity
@@ -43,7 +43,7 @@ matterManufacturer:
     deviceLabel: U-tec
     vendorId: 0x147F
     productId: 0x0001
-    deviceProfileName: lock-user-pin
+    deviceProfileName: lock-user-pin-batteryLevel
 #Level
   - id: "4767/1"
     deviceLabel: Level Lock Plus (Matter)

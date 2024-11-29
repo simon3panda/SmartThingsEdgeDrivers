@@ -25,6 +25,7 @@ if version.api < 10 then
 end
 
 local DoorLock = clusters.DoorLock
+local PowerSource = clusters.PowerSource
 local INITIAL_COTA_INDEX = 1
 local ALL_INDEX = 0xFFFE
 
@@ -59,6 +60,12 @@ local subscribed_attributes = {
   [capabilities.lockSchedules.ID] = {
     DoorLock.attributes.NumberOfWeekDaySchedulesSupportedPerUser,
     DoorLock.attributes.NumberOfYearDaySchedulesSupportedPerUser
+  },
+  [capabilities.battery.ID] = {
+    PowerSource.attributes.BatPercentRemaining
+  },
+  [capabilities.batteryLevel.ID] = {
+    PowerSource.attributes.BatChargeLevel
   }
 }
 
@@ -73,6 +80,19 @@ local subscribed_events = {
     DoorLock.events.LockUserChange
   }
 }
+
+local function only_supports_battery_level(device)
+  local PRODUCT_WITH_ONLY_BATTER_LEVEL = {
+    {0x147F, 0x0001}, -- U-tec
+  }
+  for _, p in ipairs(PRODUCT_WITH_ONLY_BATTER_LEVEL) do
+    if device.manufacturer_info.vendor_id == p[1] and
+      device.manufacturer_info.product_id == p[2] then
+      return true
+    end
+  end
+  return false
+end
 
 local function is_new_matter_lock_products(opts, driver, device)
   if device.network_type ~= device_lib.NETWORK_TYPE_MATTER then
@@ -132,6 +152,7 @@ local function do_configure(driver, device)
   local pin_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.PIN_CREDENTIAL})
   local week_schedule_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.WEEK_DAY_ACCESS_SCHEDULES})
   local year_schedule_eps = device:get_endpoints(DoorLock.ID, {feature_bitmap = DoorLock.types.Feature.YEAR_DAY_ACCESS_SCHEDULES})
+  local battery_eps = device:get_endpoints(PowerSource.ID, {feature_bitmap = PowerSource.types.PowerSourceFeature.BATTERY})
 
   local profile_name = "lock"
   if #user_eps > 0 then
@@ -141,6 +162,14 @@ local function do_configure(driver, device)
     end
     if #week_schedule_eps + #year_schedule_eps > 0 then
       profile_name = profile_name .. "-schedule"
+    end
+  end
+
+  if #battery_eps > 0 then
+    if only_supports_battery_level(device) then
+      profile_name = profile_name .. "-batteryLevel"
+    else
+      profile_name = profile_name .. "-battery"
     end
   end
   device.log.info(string.format("Updating device profile to %s.", profile_name))
@@ -344,6 +373,28 @@ end
 -----------------------------------------------------
 local function max_year_schedule_of_user_handler(driver, device, ib, response)
   device:emit_event(capabilities.lockSchedules.yearDaySchedulesPerUser(ib.data.value, {visibility = {displayed = false}}))
+end
+
+-------------------------------
+-- Battery Percent Remaining --
+-------------------------------
+local function handle_battery_percent_remaining(driver, device, ib, response)
+  if ib.data.value ~= nil then
+    device:emit_event(capabilities.battery.battery(math.floor(ib.data.value / 2.0 + 0.5)))
+  end
+end
+
+--------------------------
+-- Battery Charge Level --
+--------------------------
+local function handle_battery_charge_level(driver, device, ib, response)
+  if ib.data.value == PowerSource.types.BatChargeLevelEnum.OK then
+    device:emit_event(capabilities.batteryLevel.battery.normal())
+  elseif ib.data.value == PowerSource.types.BatChargeLevelEnum.WARNING then
+    device:emit_event(capabilities.batteryLevel.battery.warning())
+  elseif ib.data.value == PowerSource.types.BatChargeLevelEnum.CRITICAL then
+    device:emit_event(capabilities.batteryLevel.battery.critical())
+  end
 end
 
 -- Capability Handler
@@ -1640,6 +1691,10 @@ local new_matter_lock_handler = {
         [DoorLock.attributes.RequirePINforRemoteOperation.ID] = require_remote_pin_handler,
         [DoorLock.attributes.NumberOfWeekDaySchedulesSupportedPerUser.ID] = max_week_schedule_of_user_handler,
         [DoorLock.attributes.NumberOfYearDaySchedulesSupportedPerUser.ID] = max_year_schedule_of_user_handler,
+      },
+      [PowerSource.ID] = {
+        [PowerSource.attributes.BatPercentRemaining.ID] = handle_battery_percent_remaining,
+        [PowerSource.attributes.BatChargeLevel.ID] = handle_battery_charge_level,
       }
     },
     event = {
@@ -1691,7 +1746,10 @@ local new_matter_lock_handler = {
     capabilities.lock,
     capabilities.lockUsers,
     capabilities.lockCredentials,
-    capabilities.lockSchedules
+    capabilities.lockSchedules,
+    capabilities.remoteControlStatus,
+    capabilities.battery,
+    capabilities.batteryLevel
   },
   can_handle = is_new_matter_lock_products
 }
