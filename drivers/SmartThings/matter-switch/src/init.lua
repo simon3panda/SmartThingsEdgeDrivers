@@ -845,9 +845,9 @@ local function hue_attr_handler(driver, device, ib, response)
     local hue = math.floor((ib.data.value / 0xFE * 100) + 0.5)
     local current_color_mode = get_field_for_endpoint(device, COLOR_MODE, ib.endpoint_id)
     -- don't send capability events if the color of the device is being determined by CurrentX and CurrentY
-    -- (ColorMode 1), store the value for now in case the ColorMode was changed.
+    -- (ColorMode 1) or by ColorTemperatureMireds (ColorMode 2), store the value for now in case the ColorMode was changed.
     set_field_for_endpoint(device, CURRENT_HUE, ib.endpoint_id, hue, {persist = true})
-    if current_color_mode ~= 1 then
+    if current_color_mode ~= 1 and current_color_mode ~= 2 then
       device:emit_event_for_endpoint(ib.endpoint_id, capabilities.colorControl.hue(hue))
     end
   end
@@ -858,9 +858,9 @@ local function sat_attr_handler(driver, device, ib, response)
     local sat = math.floor((ib.data.value / 0xFE * 100) + 0.5)
     local current_color_mode = get_field_for_endpoint(device, COLOR_MODE, ib.endpoint_id)
     -- don't send capability events if the color of the device is being determined by CurrentX and CurrentY
-    -- (ColorMode 1), store the value for now in case the ColorMode was changed.
+    -- (ColorMode 1) or by ColorTemperatureMireds (ColorMode 2), store the value for now in case the ColorMode was changed.
     set_field_for_endpoint(device, CURRENT_SAT, ib.endpoint_id, sat, {persist = true})
-    if current_color_mode ~= 1 then
+    if current_color_mode ~= 1 and current_color_mode ~= 2 then
       device:emit_event_for_endpoint(ib.endpoint_id, capabilities.colorControl.saturation(sat))
     end
   end
@@ -959,10 +959,10 @@ local function x_attr_handler(driver, device, ib, response)
     local h, s, _ = color_utils.safe_xy_to_hsv(x, y)
     local current_color_mode = get_field_for_endpoint(device, COLOR_MODE, ib.endpoint_id)
     -- don't send capability events if the color of the device is being determined by CurrentHue and CurrentSaturation
-    -- (ColorMode 0), store the values for now in case the ColorMode was changed.
+    -- (ColorMode 0) or by ColorTemperatureMireds (ColorMode 2), store the values for now in case the ColorMode was changed.
     set_field_for_endpoint(device, CURRENT_HUE, ib.endpoint_id, h, {persist = true})
     set_field_for_endpoint(device, CURRENT_SAT, ib.endpoint_id, s, {persist = true})
-    if current_color_mode ~= 0 then
+    if current_color_mode ~= 0 and current_color_mode ~= 2 then
       device:emit_event_for_endpoint(ib.endpoint_id, capabilities.colorControl.hue(h))
       device:emit_event_for_endpoint(ib.endpoint_id, capabilities.colorControl.saturation(s))
     end
@@ -979,10 +979,10 @@ local function y_attr_handler(driver, device, ib, response)
     local h, s, _ = color_utils.safe_xy_to_hsv(x, y)
     local current_color_mode = get_field_for_endpoint(device, COLOR_MODE, ib.endpoint_id)
     -- don't send capability events if the color of the device is being determined by CurrentHue and CurrentSaturation
-    -- (ColorMode 0), store the values for now in case the ColorMode was changed.
+    -- (ColorMode 0) or by ColorTemperatureMireds (ColorMode 2), store the values for now in case the ColorMode was changed.
     set_field_for_endpoint(device, CURRENT_HUE, ib.endpoint_id, h, {persist = true})
     set_field_for_endpoint(device, CURRENT_SAT, ib.endpoint_id, s, {persist = true})
-    if current_color_mode ~= 0 then
+    if current_color_mode ~= 0 and current_color_mode ~= 2 then
       device:emit_event_for_endpoint(ib.endpoint_id, capabilities.colorControl.hue(h))
       device:emit_event_for_endpoint(ib.endpoint_id, capabilities.colorControl.saturation(s))
     end
